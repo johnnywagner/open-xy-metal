@@ -424,6 +424,43 @@ d = _d_saved
 Path('machines/rings2/display_tables.h').write_text('\n'.join(d2).replace('namespace rings {', 'namespace rings2 {') + '\n')
 
 # ======================================================================================================================
+# rings4: rings2 with STRETCH as a path through resonator shapes (machines/rings4): the reference's own material tables
+# (rings.c, MODAL_TAB) and rings2's material, squeezed and stretched. Each stop is flat for SPOT_DETENT either side;
+# between stops each mode's log2 ratio glides (smoothstep). Its tables.h is rings2's plus these.
+SPOTS = [  # (STRETCH as 2 x - 1, name, ratios to the note, level trim dB)
+    (-1.00, 'squeezed', [r ** 0.5 for r in rm], 0.0),
+    (-0.60, 'drum', [1, 1.593, 2.136, 2.296, 2.653, 2.918, 3.156, 3.501], -7.0),
+    (-0.25, 'bell', [0.5, 1, 1.2, 1.5, 2, 2.5, 3, 4], 0.0),
+    (0.00, 'material', rm, 0.0),
+    (0.65, 'stretched', [r ** 2 for r in rm], 0.0),
+    (1.00, 'bar', [1, 2.756, 5.404, 8.933, 13.34, 18.64, 24.81, 31.87], -7.0),
+]
+SPOT_DETENT = 0.04
+_saved, out = out, []
+out.append('// ---- rings4: STRETCH as a path through resonator shapes')
+const('SPOTS', len(SPOTS), 'stops along STRETCH: ' + ', '.join(sp[1] for sp in SPOTS))
+table('SPOT_C', [int(round(sp[0] * (1 << 30))) for sp in SPOTS], comment='where each stop sits, STRETCH as 2 x - 1, Q30')
+const('SPOT_DETENT', int(round(SPOT_DETENT * (1 << 30))), 'each stop is flat this far either side, Q30')
+table('SPOT_INV', [q(1 / (SPOTS[i + 1][0] - SPOTS[i][0] - 2 * SPOT_DETENT), 27) for i in range(len(SPOTS) - 1)],
+      comment='1 / the glide between two stops (their distance less both detents), Q27')
+table('L_SPOT', [log2q(r) for sp in SPOTS for r in sp[2]], comment="log2 of each mode's ratio to the note at each stop, Q24")
+table('SPOT_LEV', [q(sp[3] / (20 * math.log10(2)), LOGQ) for sp in SPOTS], comment='level trim at each stop, log2, Q24')
+r4_extra = out; out = _saved
+r4_text = r2_text[:r2_text.rindex('}')].rstrip('\n') + '\n' + '\n'.join(r4_extra) + '\n}\n'
+r4_text = r4_text.replace('namespace rings2 {', 'namespace rings4 {').replace("rings' tables with rings2's trim, then its own", "rings' tables with rings2's trim, then rings2's and rings4's own")
+Path('machines/rings4').mkdir(exist_ok=True)
+Path('machines/rings4/tables.h').write_text(r4_text)
+d4 = d2[:-1] + ['// where each mode sits at each STRETCH stop: log2 of its ratio to the note, Q10',
+                f'const opxy::i32 DISPLAY_SPOT[{8 * len(SPOTS)}] = {{'] + \
+     ['    ' + ', '.join(str(round(math.log2(r) * 1024)) for r in sp[2]) + ',' for sp in SPOTS] + \
+     ['};', '// the stops along STRETCH (2 x - 1), Q10',
+      f'const opxy::i32 DISPLAY_SPOT_C[{len(SPOTS)}] = {{ ' + ', '.join(str(round(sp[0] * 1024)) for sp in SPOTS) + ' };',
+      '// 1 / each glide between stops (less both detents, 41 / 1024 each), Q20 per Q10 unit',
+      f'const opxy::i32 DISPLAY_SPOT_INV[{len(SPOTS) - 1}] = {{ ' + ', '.join(
+          str(round(2 ** 20 / (round(SPOTS[i + 1][0] * 1024) - round(SPOTS[i][0] * 1024) - 82))) for i in range(len(SPOTS) - 1)) + ' };', '}']
+Path('machines/rings4/display_tables.h').write_text('\n'.join(d4).replace('namespace rings {', 'namespace rings4 {') + '\n')
+
+# ======================================================================================================================
 # rings3: the same voice with a tuned feedback delay for a resonator (machines/rings3). Its tables.h is rings'
 # (in its own namespace) plus these.
 FS2 = FS / 2                                       # the delay loop runs at half rate

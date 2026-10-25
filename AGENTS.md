@@ -13,7 +13,8 @@ effects). It is not the SDK.
   SDK lacks something a machine needs, tell the user. It becomes a separate
   pull request to the SDK's `staging` branch, not part of the machine.
 - **This repository holds rings** (`machines/rings`), a fixed-point port of the float reference in `port-kit/`;
-  rings2 (`machines/rings2`), rings with the reference's own mode tuning; and rings3 (`machines/rings3`), the
+  rings2 (`machines/rings2`), rings with the reference's own mode tuning; rings4 (`machines/rings4`), rings2 with
+  STRETCH as a path through resonator shapes; and rings3 (`machines/rings3`), the
   same voice with a delay-loop resonator (its test: `tests/loop.cpp`).
   Read README.md and port-kit/BRIEF.md first. `tools/gen_tables.py` generates `tables.h` and `display_tables.h`;
   edit the generator, not the headers. Check sound changes with `tests/sound.cpp` (run by `sdk.py test`) and
