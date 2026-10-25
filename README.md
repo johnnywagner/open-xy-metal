@@ -3,13 +3,19 @@
 rings is a two-operator FM exciter that drops onto each note and strikes a MODAL resonator. This
 repository ports it to the OP-XY as an [Open-XY](https://github.com/etcetc000/open-xy) synth machine. It is a
 fixed-point rewrite of the float reference engine in [port-kit/](port-kit/BRIEF.md): Q31 throughout, with no float,
-division or 64-bit arithmetic in the render path. Its sound is checked against the reference stage by stage.
+division or 64-bit arithmetic in the render path. Its algorithm is checked against a double-precision model stage by
+stage. Since the port, its knob mappings have been made more tonal (Controls), so it no longer matches the reference
+note for note.
+
+**rings_alt** ([machines/rings_alt](machines/rings_alt)) is the same voice with a tuned feedback delay for a resonator
+instead of eight modes: harmonic, cheaper, and a place to try other ideas (rings_alt, below).
 
 | Folder | What |
 | --- | --- |
 | [machines/rings](machines/rings) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
+| [machines/rings_alt](machines/rings_alt) | The delay-loop version: the same files, its own `engine.cpp`, `core.h` and page, and its test `tests/loop.cpp` |
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
-| [tools/gen_tables.py](tools/gen_tables.py) | Generates `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
+| [tools/gen_tables.py](tools/gen_tables.py) | Generates both machines' `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
 | [tools/probe.c](tools/probe.c) | The float reference with every stage exposed, for levels and debugging |
 
@@ -20,13 +26,25 @@ The SDK lives beside this repository (`../open-xy`, branch `staging`).
 | Encoder | Control | Readout |
 | --- | --- | --- |
 | 1 | DROP: the FM starts away from the note and drops onto it. One knob drives the start offset (+9 to -31.5 semitones) and the time (37 to 79 ms) | 0..100 |
-| 2 | RATIO: op2 : carrier, 0..1 | 0.00..1.00 |
-| 3 | STRETCH: mode spacing, squeezed (-100), as the material (0), spread (+100) | -100..+100 |
-| 4 | MODES: 1..4 modes (the reference's first four), continuous; the next mode fades in | 1.0..4.0 |
+| 2 | RATIO: op2 : carrier, 0..1, pulled onto simple ratios | 0.00..1.00 |
+| 3 | STRETCH: the harmonic series in the middle, the material at -50 and +50, squeezed (-100) or spread (+100) | -100..+100 |
+| 4 | MODES: 1..8 modes, continuous; the next mode fades in | 1.0..8.0 |
 
-The mappings are the reference's, applied in `engine.cpp`. The defaults are the dialed-in sound, saved as the
-**Rings** preset. **Material**, **All modes** and **Fall** are the same sound with STRETCH at 0, MODES at 4 and DROP
-at 100.
+DROP and MODES are the reference's mappings. The others were changed to make rings more tonal:
+
+- **The first mode is always on the note.** The material counts from it, so the loudest, lowest mode is the pitch you
+  play (in the reference it sat at 0.54 of the note, and STRETCH moved it further).
+- **STRETCH has a harmonic middle.** Within 6 of 0 the modes are the harmonic series (1, 2, 3 ... 8 times the note),
+  exactly on their multiples. Out to +-50 they morph to the material's ratios; beyond, as before, the material is
+  squeezed to ratio^1/2 or spread to ratio^2.
+- **RATIO has magnets** at 1/8, 1/6, 1/5, 1/4, 1/3, 2/5, 1/2, 3/5, 2/3, 3/4 and 1: within 0.07 octave of one, the
+  ratio is pulled onto it (flat at the magnet, continuous at the edge). Between them it is free.
+- **No lattice make-up.** The reference boosted modes that sat off the FM's harmonics by up to 18 dB so they caught as
+  much of it as on them. That is gone: off-harmonic modes now ring quieter. Modes stretched up still get up to 12 dB.
+- **The modes stop at 11 kHz** (fs/4), fading from 9.9 kHz.
+
+The presets: **Rings** (the dialed-in sound, STRETCH +100), **Harmonic** (STRETCH 0), **Material** (STRETCH +50),
+**All modes** (MODES 8) and **Fall** (DROP 100).
 
 ### Envelope: option B
 
@@ -49,6 +67,14 @@ against the kit's renders):
   is shaped by sqrt(L), so the ring rings on after the strike has faded. With DECAY at 0.3 the B version is 40 to
   70 dB below the reference from 0.5 to 1.5 s.
 
+## Level
+
+The output is 12 dB above the brief's level, which was 13 dB under 2op FM. With the first mode on the note the modes
+catch more of the FM, so their drive is trimmed 8 dB (`RES_TRIM_DB`). Held at C2 to C5 (no envelope), the first second
+measures about -17 to -19.5 dBFS RMS against 2op FM's -20. The strike peaks at -7 to -12 dBFS, under the SDK's
+half-scale ceiling (-6 dBFS), where the output is clamped: the loudest setting (RATIO 1) touches it. To match the stock
+wavetable synth exactly, record both at the same note and settings and change `LEVEL_DB` in `tools/gen_tables.py`.
+
 ## How it was checked
 
 ```sh
@@ -60,19 +86,18 @@ python tools/gen_tables.py             # after changing a constant
 **Stage by stage, sample by sample** (`tests/sound.cpp`, run by `sdk.py test`):
 
 - The test compiles the reference into itself twice: as it is, and in double precision with the machine's own
-  algorithm (the 1x core, the FIR, the undamped modes fed in pairs) built on the reference's state and set-up.
+  algorithm (the 1x core, the fitted chain, the half-rate modes and their interpolation, the strike's rotation) built
+  on the reference's state and set-up.
 - It renders all 27 reference settings through the port and through the double-precision model, and compares the
   FM core, the resonator's drive, the mix after the modes and the output.
-- Every stage of every setting matches that model at 58 to 72 dB SNR, including C1, where low modes sit near 20 Hz.
-- The float reference itself sits further from its own formulas. Its float32 `2 r cos th` puts low modes a few cents
-  off, and its float32 resonators have a noise floor 20 to 30 dB above the port's.
+- The model takes the tonal mappings from the engine (`stretch_map`, `ratio_magnet`).
+- Every stage of every setting matches that model at 59 to 70 dB SNR, except one: C1 at extreme settings reaches
+  53 dB at the output. There the first mode sits on the note, driven at its own frequency, with a 0.6 Hz bandwidth,
+  and its Q30 coefficient's tuning (about 1e-5, 0.02 cents) shows. The output's limit is 50 dB, the others 55.
 
-**As sound** (`tools/check_renders.py`, `compare.py`, the port against the float reference as the machine runs it):
-
-- Every setting that uses at most 4 modes PASSES: 23 of the 27 renders. Level is within 0.04 dB median and 0.26 dB
-  p99, spectrum within 0.23 dB, onset within 0.16 dB.
-- The other four (`modes_050`, `modes_100`, `extreme_a`, `extreme_b`) use modes 5 to 8 in the reference. Those modes
-  no longer exist, so their bands are missing; the machine renders them with MODES at 4.
+**As sound:** `tools/check_renders.py` still compares the port with the float reference, but the tonal mappings move
+the modes and the ratio, so most settings now differ from it on purpose. Before them, 8 of the 27 settings passed
+compare.py's tolerances, and every setting's level was within 0.21 dB median.
 
 **Fixed point only:**
 
@@ -83,52 +108,78 @@ python tools/gen_tables.py             # after changing a constant
 
 ## Design notes
 
-The engine is the reference's signal path, simplified for the OP-XY's CPU. Each simplification was kept only if
-`compare.py` still passed against the float reference on every setting.
+The engine is the reference's signal path, simplified for the OP-XY's CPU.
 
 - **FM core at 1x.** The reference runs its core at 2x with a half-band decimator. Here it runs at 1x with the 2x
   rate's quantities: op2's sample difference halved, the carrier's phase offset doubled, and the one-poles at their
   1x coefficient. While op2 is below 260 Hz (RATIO low, as in the default sound), op2 and its one-poles run at half
-  rate, with its feedback extrapolated to where the 2x core would read it. Above that, half rate cost up to 3 dB at
-  the onset of high notes, so it isn't used there.
-- **Modes** are the reference's two-pole resonators, run undamped with their decay (`r^16`) applied every 16
-  samples. Each takes its input once per two samples as the pair's sum, with its gain corrected by `1/cos(th/2)`. That
-  is 1.5 multiplies per mode-sample instead of 3. Low modes keep `2 - 2 cos th` as a Q31 coefficient, so a mode at
-  20 Hz holds its tuning to about 0.05 cents. Modes run in pairs, sharing the input and the accumulator.
-- **At most 4 modes.** MODES runs 1..4 over the reference's first four modes (the default, 2 modes, is unchanged).
-  Eight modes cost about 2,400 SDK-estimated instructions each, which kept the heaviest setting above the risk line.
-- **Low modes are fed once per four samples.** Modes below fs/8 take the drive's sum `[1/2 1 1 1 1/2]` once per four
-  samples, centred on the samples it sums, with its gain at the mode (`cos th cos^2(th/2)`) corrected.
-- **Both fixed low-passes** (20.7 kHz, Q 0.2) are one 3-tap linear-phase FIR (1 multiply), within 0.7 dB to 8 kHz
-  and 1.3 dB to 16 kHz of the pair. It runs before the resonator: the chain after the FM core is linear. STRIKE, which
-  the reference sends through the second low-pass after the modes, goes through the exact low-pass in its table.
-- **Filters** are RBJ biquads in direct form I, stored near their poles as `2 + a1` and `1 - a2`. The high-passes run
-  unnormalised (2 multiplies each). The presence peak runs as x plus a band-pass of Q·A, which is exactly the RBJ peak
-  (3 multiplies). Their gains, the dry share and the output gain all live in the shelf's coefficients.
-- **Not simplified:** both keytracked high-passes. Folding the second one into the modes' gains failed `compare.py`
-  (onsets of the drop, mid ratios): it shapes the FM's content below the note, which is not modal.
-- **Transcendentals and divisions** happen only in set-up, made of table sine, log2 and exp2 (`fixmath.h`).
-- **Output:** the loudest reference setting (RATIO 1) peaks at 0.127 of full scale, about 1/8 as 2op FM does
-  (gain 143). The declared peak is 3/16 full scale.
+  rate, with its feedback extrapolated to where the 2x core would read it. Sines come from a 4096-point table without
+  interpolation.
+- **The chain, fitted.** The reference's two keytracked high-passes, presence peak and high shelf (sixth order) are two
+  biquads here, fitted in units of the note (`tools/gen_tables.py`, CHAIN): within 1.4 dB from 0.2 times the note, 0.9 dB
+  from half the note. A resonant high-pass shapes the drive (where the reference's first high-pass and presence peak
+  are), and a band follows the modes. Both are made per note by the bilinear transform, stored near their poles.
+- **Modes** are the reference's two-pole resonators, run undamped, with their decay (`r^16`) applied every 16 samples.
+- **Low modes at half rate.** A mode below fs/8 (chosen at note-on) steps by twice its angle and takes the drive's
+  sum by four once per four samples, which at the even samples is exactly the full-rate mode fed by four. The
+  half-rate modes are summed and interpolated back with an 8-tap half-band filter (images 53 dB down at 4.4 kHz, 39 dB at
+  5.5 kHz). The mix runs 8 samples (0.2 ms) late for it.
+- **Other modes** take their input once per two samples as the pair's sum (gain corrected by `1/cos(th/2)`), two
+  modes per loop sharing the input and the accumulator. Low modes keep `2 - 2 cos th` as their coefficient, so a mode
+  at 20 Hz holds its tuning to about 0.05 cents.
+- **STRIKE** rings through its own copy of each mode for the note's first 16 samples, then joins the mode rotated by
+  the filters it skips in the reference (magnitude and phase).
+- **Both fixed low-passes** (20.7 kHz, Q 0.2) are one 3-tap linear-phase FIR made of shifts, within 0.7 dB to 8 kHz and
+  1.3 dB to 16 kHz of the pair.
+- **Transcendentals and divisions** happen only in set-up, made of table sine, log2 and exp2 (`fixmath.h`). The sine
+  table's interpolation puts its curvature back, which keeps modes driven on their own frequency tuned to a few parts
+  in 10^9.
 
-The 2x-core version and the first 1x version are earlier commits.
+The 2x-core version, the first 1x version, the 4-mode version and the 8-mode version before the tonal mappings are
+earlier commits.
+
+## rings_alt
+
+The same FM core, onset, chain and level, with one tuned feedback delay instead of the eight modes. It rings every
+harmonic of the note at once, so its cost does not grow with them. It runs at half rate (partials up to 11 kHz, as the
+modes) and is interpolated back as the half-rate modes are.
+
+| Encoder | Control | Readout |
+| --- | --- | --- |
+| 1, 2 | DROP, RATIO: as rings (RATIO's magnets too) | |
+| 3 | STRETCH: harmonic in the middle (within 6 of 0). Right: stiffer, the partials stretch up, partial 8 up to 12 times the note (8.4 to 12 depending on the note; less above 1 kHz). Left: hollow, the even harmonics fade out, odd only at -100 | -100..+100 |
+| 4 | TONE: how long the upper harmonics ring. 100: as long as the note; 0: the 4th harmonic dies 25 times as fast | 0..100 |
+
+- **The loop:** a 2048-sample line, read through a first-order allpass fractional delay, two first-order dispersion
+  allpasses (STRETCH right; their coefficient from a table by note and amount, so the stretch is about the same at
+  every note), a one-pole low-pass designed per note for TONE that also carries the loss, then the drive and STRIKE.
+  STRETCH left mixes in a second tap at half the period, inverted, which cancels the even harmonics.
+- **Tuning** takes the phase delays of the low-pass, the dispersion and the fractional allpass at the note into
+  account (table atan): within 1 cent from C1 to C7 at every setting (`tests/loop.cpp`).
+- **Ring time:** the note rings as rings' first mode does; the drive is scaled so the note's resonance peaks at the
+  same level at every pitch. Notes below 11 Hz go up an octave.
+- **Presets:** **Rings Alt** (harmonic, TONE 60), **Stiff**, **Hollow**, **Dark** and **Fall**.
+- Pitch bends retune the loop in steps (each 3.4 cents or more); a big bend can click.
 
 ## CPU
 
 Counting instructions per voice block with the Q31 multiply as the one instruction it is on the Blackfin (valgrind,
-the most repeatable figure here):
+the most repeatable figure here), at 440 Hz as the SDK times it:
 
-| Setting | rings now | rings with 8 modes, before simplifying | 2op FM |
-| --- | --- | --- | --- |
-| The defaults (2 modes) | 13,700 | 18,000 | 5,600 |
-| MODES at 4 | 15,200 | 25,000 (8 modes) | |
-| DROP, RATIO and MODES at full, STRETCH 0 | 16,500 | | |
+| Setting | rings | rings_alt | rings, 4 modes (before) | 2op FM |
+| --- | --- | --- | --- | --- |
+| The defaults | 10,900 | 9,700 | 13,700 | 5,600 |
+| The heaviest knob of the SDK's sweep | 13,900 (MODES 8) | 10,600 (RATIO up) | 16,500 | |
+| The heaviest across pitches | 16,200 (harmonic, 8 modes, about 1 kHz) | 10,600 (any pitch) | | |
 
-A rings voice now costs about 2.5 to 3 times a 2op FM voice. `sdk.py test` estimates **about 22,000 to 41,000
-Blackfin instructions per voice block** at the heaviest setting (around 31,000 typical; before: 50,000 to 76,000).
-The host timing is noisy, and 2op FM reads 11,400 to 12,900 in the same session. The aim is 15,000, and above 24,000
-audio may drop with several voices, so the heaviest setting is near that line rather than under the aim. A pitch bend
-that re-runs the note set-up every block adds several thousand. No device measurement has been made.
+Stopping the modes at 11 kHz saves most at high notes (about 15 to 20% at C6 and C7). A note-on block costs about
+31,700 once in rings (the set-up of eight modes and the strike).
+
+`sdk.py test` estimates **about 24,000 to 28,500 Blackfin instructions per voice block for rings** and **16,000 to 20,000
+for rings_alt** at their heaviest settings; 2op FM reads about 14,000. The estimate times the host, where the SDK's
+portable Q31 multiply takes a dozen instructions and an unpredictable branch, so it overstates multiply-heavy engines
+such as these, and it varies by a fifth between runs here. The aim is 15,000, and above 24,000 audio may drop with
+several voices. No device measurement has been made.
 
 ## Voices
 

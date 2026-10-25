@@ -12,7 +12,8 @@ effects). It is not the SDK.
   raw addresses. Audio callbacks never allocate, block, log or do I/O. If the
   SDK lacks something a machine needs, tell the user. It becomes a separate
   pull request to the SDK's `staging` branch, not part of the machine.
-- **This repository holds rings** (`machines/rings`), a fixed-point port of the float reference in `port-kit/`.
+- **This repository holds rings** (`machines/rings`), a fixed-point port of the float reference in `port-kit/`,
+  and rings_alt (`machines/rings_alt`), the same voice with a delay-loop resonator (its test: `tests/loop.cpp`).
   Read README.md and port-kit/BRIEF.md first. `tools/gen_tables.py` generates `tables.h` and `display_tables.h`;
   edit the generator, not the headers. Check sound changes with `tests/sound.cpp` (run by `sdk.py test`) and
   `tools/check_renders.py`. The render path stays free of float, division and 64-bit arithmetic.

@@ -25,6 +25,15 @@ SW_FROM, SW_TO, SW_CURVE, SW_CURVE2, SW_MID = 0.6274609374999999, 0.060000000000
 TM_FROM, TM_TO, TM_CURVE, TM_CURVE2, TM_MID = 0.49197265625000003, 0.6733984375000001, 0.6329296875, 0.6794140624999999, 0.66265625
 DIST_PAD, G_FM, G_FX = f32(0.0853168), f32(-1.5483), f32(-0.7249)
 HP_RATIO, HP_Q, LP_FC, LP_Q, HS_RATIO = 0.45, 0.7, 20708.0, 0.2, 6.0
+# Tonal mappings (not in the reference): the modes stop at fs/4; STRETCH's middle is the harmonic series; RATIO is
+# pulled onto simple op2 : carrier ratios.
+MODE_TOP = 0.25
+# With the first mode on the note and no lattice make-up, the modes catch more of the FM: their drive is trimmed.
+RES_TRIM_DB = -8.0
+RES_TRIM = 10 ** (RES_TRIM_DB / 20)
+STRETCH_HARM = 0.06
+MAGNETS = [1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 2 / 5, 1 / 2, 3 / 5, 2 / 3, 3 / 4, 1]
+MAGNET_W = 0.07
 ATTACK_MIN, RES_GAIN, STRIKE_P0 = 0.003, 2.66, 0.012
 BLOCK = 16
 MODAL_TAB = [[1, 2, 3, 4, 5, 6, 7, 8],
@@ -34,8 +43,11 @@ MODAL_TAB = [[1, 2, 3, 4, 5, 6, 7, 8],
 MODE_HASH = [0.31, -0.83, 0.62, -0.17, 0.94, -0.55, 0.08, -0.71]
 
 # ---- the machine's scaling (see engine.cpp) ----
-# Output gain: the brief's gain 143, so the loudest reference setting (ratio 1) peaks near 0x10000000.
-OUT_GAIN = 143.0
+# Output gain: the brief's gain 143 put the loudest reference setting (ratio 1) at 0x10000000, but rings then sat
+# 13 dB below 2op FM (the SDK's stock-loudness reference) in K-weighted loudness. LEVEL_DB lifts it 12 dB; the engine
+# clips at half scale, which only the loudest settings' first transient reaches.
+LEVEL_DB = 12.0
+OUT_GAIN = 143.0 * 10 ** (LEVEL_DB / 20)
 CORE_X = 1.0         # the FM core's output is the reference's x (its carrier at 1/16 full scale; x = car / 2)
 DRIVE_SCALE = 8.0    # into and through the resonator: 8x the reference's level
 LOGQ = 24            # log2 values are Q24
@@ -168,7 +180,7 @@ while n / FS < Wp:
 MS = 2 ** MODE_SHIFT
 WET_RATIO = WET / (1 - WET)
 # b = (1 - r) M ra RES_GAIN x ..., M = 2 sqrt(r) sin th sqrt(1 + eps): all but sin th and sqrt(1 + eps) here
-lb = [log2q((1 - pole[k]) * 2 * math.sqrt(pole[k]) * ra[k] * RES_GAIN * WET_RATIO * MS) for k in range(8)]
+lb = [log2q((1 - pole[k]) * 2 * math.sqrt(pole[k]) * ra[k] * RES_GAIN * WET_RATIO * MS * RES_TRIM) for k in range(8)]
 leps = [log2q((1 - pole[k]) ** 2 / (4 * pole[k])) for k in range(8)]
 # strike: bi = sin th sqrt(ra) RES_GAIN edge wk 2 / (Wp fs wsum)
 lbp = [log2q(RES_GAIN * 2 / (Wp * FS) * WET_RATIO * MS) for k in range(8)]
@@ -184,23 +196,61 @@ t0 = 5 * 60 ** TM_FROM; t1 = 5 * 60 ** TM_TO        # ms
 sweep_e = 1 + 3 * (SWEEPC - 0.5) * 2
 assert SWEEPC >= 0.5
 
-# The second fixed low-pass now runs ahead of the modes, so STRIKE, which went through it after the modes, goes
-# through it here instead: a fixed filter on a fixed pulse.
-lp_b, lp_a = None, None
+# STRIKE goes into the modes as the reference's raw pulse: every filter now runs after the modes, on the mix.
 def rbj_lp(f, Q):
     w0 = 2 * math.pi * f / FS; al = math.sin(w0) / (2 * Q); c = math.cos(w0); a0 = 1 + al
     return [(1 - c) / 2 / a0, (1 - c) / a0, (1 - c) / 2 / a0], [1, -2 * c / a0, (1 - al) / a0]
 lp_b, lp_a = rbj_lp(LP_FC, LP_Q)
-padded = pulse + [0.0] * 60
-strike = []
-x1 = x2 = y1 = y2 = 0.0
-for x in padded:
-    y = lp_b[0] * x + lp_b[1] * x1 + lp_b[2] * x2 - lp_a[1] * y1 - lp_a[2] * y2
-    x2, x1, y2, y1 = x1, x, y1, y
-    strike.append(y)
-while abs(strike[-1]) < 1e-6 * max(abs(v) for v in strike): strike.pop()
-strike = strike[:48]
-assert len(strike) <= 64
+strike = pulse + [0.0] * (16 - len(pulse))      # padded to the 16-sample step the strike runs in
+
+# The presence peak (4x the note, Q 0.8, +10.3 dB) and the high shelf (6x the note, slope 1, +7.7 dB) as one biquad:
+# an analog prototype in s / (2 pi f0), fitted to their product (scipy least squares on log magnitude, 0.05..60 x the
+# note), made digital per note by the bilinear transform warped at the note. Within 0.26 dB to 25 x the note.
+EQ = dict(b2=2.5799, b1=11.3473, b0=16.21, a1=3.4644, a0=16.1646)
+def eq_target(w):
+    A1 = 10 ** (12 * PRESENCE / 40); A2 = 10 ** (HIGHSHELF / 40); sj = 1j * w
+    x = sj / 4; pk = (x * x + x * A1 / 0.8 + 1) / (x * x + x / (A1 * 0.8) + 1)
+    x = sj / 6; Q = 1 / math.sqrt(2); hs = A2 * (A2 * x * x + math.sqrt(A2) / Q * x + 1) / (x * x + math.sqrt(A2) / Q * x + A2)
+    return pk * hs
+_w = np.logspace(math.log10(0.05), math.log10(25), 400); _s = 1j * _w
+_fit = (EQ['b2'] * _s * _s + EQ['b1'] * _s + EQ['b0']) / (_s * _s + EQ['a1'] * _s + EQ['a0'])
+assert np.max(np.abs(20 * np.log10(np.abs(_fit) / np.abs(eq_target(_w))))) < 0.3
+
+# The whole keytracked chain after the modes, both high-passes (0.45 x the note, Q 0.7) and that EQ, sixth order, as two
+# biquads (fourth order): a high-pass s^2 / (s^2 + a1 s + a0) and a band s (b2 s + b1) / (s^2 + c1 s + c0), fitted to the
+# product on log magnitude, 0.1..25 x the note (below 0.3 weighted 0.3). Within 1.4 dB from 0.2 x the note (where the
+# chain is already 28 dB down), 0.9 dB from half the note, 0.7 dB above 4x; 4 dB at 0.1..0.2 (30 to 52 dB down).
+CHAIN = dict(a1=0.3066, a0=0.21686, b2=2.43331, b1=16.70592, c1=5.56414, c0=20.15355)
+def hp_analog(r):
+    W = 1j * r / HP_RATIO
+    return W * W / (W * W + W / HP_Q + 1)
+def eq_fit(r):
+    s_ = 1j * r
+    return (EQ['b2'] * s_ * s_ + EQ['b1'] * s_ + EQ['b0']) / (s_ * s_ + EQ['a1'] * s_ + EQ['a0'])
+def chain_hp(r):
+    s_ = 1j * r
+    return s_ * s_ / (s_ * s_ + CHAIN['a1'] * s_ + CHAIN['a0'])
+def chain_band(r):
+    s_ = 1j * r
+    return (CHAIN['b2'] * s_ * s_ + CHAIN['b1'] * s_) / (s_ * s_ + CHAIN['c1'] * s_ + CHAIN['c0'])
+def chain_fit(r):
+    return chain_hp(r) * chain_band(r)
+_e = 20 * np.log10(np.abs(chain_fit(_w)) / np.abs(hp_analog(_w) ** 2 * eq_fit(_w)))
+assert np.max(np.abs(_e[_w >= 0.2])) < 1.4 and np.max(np.abs(_e[_w >= 0.5])) < 0.95
+
+# In the reference STRIKE skips the first high-pass and the presence peak (they shape the drive) and goes through the
+# second high-pass and the shelf. Here the fitted high-pass shapes the drive and the band follows the modes, so each
+# mode's strike is rotated by G = HP HS / BAND = HP EQ / (PK BAND) at the mode, r its ratio to the note (analog
+# prototypes), magnitude and phase (engine.cpp, strike_step).
+def hp_pk(r):
+    W = 1j * r / HP_RATIO
+    hp = W * W / (W * W + W / HP_Q + 1)
+    A1 = 10 ** (12 * PRESENCE / 40); x = 1j * r / 4
+    pk = (x * x + x * A1 / 0.8 + 1) / (x * x + x / (A1 * 0.8) + 1)
+    return hp * pk
+def strike_gain(r):
+    return hp_analog(r) * eq_fit(r) / (hp_pk(r) / hp_analog(r) * chain_band(r))
+strike_g = [strike_gain(2 ** (i / 16 - 4)) for i in range(161)]
 
 # Both fixed low-passes as one 3-tap linear-phase FIR with DC gain 1, x1 + h (x0 + x2 - 2 x1): |H|^2 of the
 # low-pass, least squares to 16 kHz (within 0.7 dB to 8 kHz, 0.9 dB to 12 kHz, 1.3 dB to 16 kHz).
@@ -211,6 +261,9 @@ basis = np.stack([np.ones_like(fr), 2 * np.cos(2 * np.pi * fr / FS)], 1)
 weight = np.where(fr < 16000, 1.0, 0.2)
 fir = np.linalg.lstsq(basis * weight[:, None], target * weight, rcond=None)[0]
 fir = fir / (fir[0] + 2 * fir[1])
+# h rounded to 1/8 + 1/512, so the engine applies it with two shifts
+assert abs(fir[1] - (1 / 8 + 1 / 512)) < 5e-4, fir[1]
+fir = np.array([1 - 2 * (1 / 8 + 1 / 512), 1 / 8 + 1 / 512])
 fir_err = 20 * np.log10(np.abs(basis @ fir)[fr < 16000] / target[fr < 16000])
 assert np.max(np.abs(fir_err)) < 1.4, np.max(np.abs(fir_err))
 
@@ -230,39 +283,42 @@ const('BITE_DECAY', q(math.exp(-dt / 0.025)), 'BITE falls by this per 16 samples
 const('ATTACK_STEP', q(att_step), "the onset's linear level ramp per 16 samples (3 ms), Q31")
 table('EASE', [qs(w) for w in ease], comment="the onset's ease-in (smoothstep) after each 16 samples, Q31")
 const('MODE_SHIFT', MODE_SHIFT, 'the mode states carry 2^this x their share of the mix')
-const('LP_FIR', q(fir[1]), 'both fixed 20.7 kHz low-passes (Q 0.2) as one 3-tap linear-phase FIR, DC gain 1: x1 + h (x0 + x2 - 2 x1), Q31')
-const('L_OUT', log2q(OUT_G), 'log2 of the mix to the output: dry share x both stage gains x 143; folded into the shelf')
+const('LEVEL_DB', int(LEVEL_DB), 'the output level over the brief (dB)')
+const('LP_FIR', q(fir[1]), 'both fixed 20.7 kHz low-passes (Q 0.2) as one 3-tap linear-phase FIR, DC gain 1: x1 + h (x0 + x2 - 2 x1), h = 1/8 + 1/512, Q31')
+const('L_OUT', log2q(OUT_G), 'log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB; folded into the EQ')
 const('HP_RATIO', q(HP_RATIO), 'keytracked high-pass at 0.45 x the note, Q31')
-const('HP_INVQ', q(1 / HP_Q, 30), 'keytracked high-pass 1/Q, Q30')
-const('PK_INVQ', q(1 / 0.8, 30), 'presence peak 1/Q, Q30')
-const('PK_A', q(PK_A, 29), 'presence peak A (+10.3 dB), Q29')
-const('PK_AINV', q(1 / PK_A), '1/A, Q31')
-const('PK_A2M1', q(PK_A * PK_A - 1, 29), 'A^2 - 1, Q29: the peak is x + (A^2 - 1) x a band-pass of Q A')
-const('HS_A', q(HS_A, 29), 'high shelf A (+7.7 dB), Q29')
-const('HS_AP1', q(HS_A + 1, 28), 'A + 1, Q28')
-const('HS_AM1', q(HS_A - 1, 28), 'A - 1, Q28')
-const('HS_SQ', q(2 * math.sqrt(2 * HS_A), 28), '2 sqrt(2 A): with sin(w0/2) cos(w0/2), 2 sqrt(A) alpha (slope 1), Q28')
-const('INC_PRESENCE_RATIO', 4, 'presence peak at 4x the note')
-const('INC_SHELF_RATIO', 6, 'high shelf at 6x the note')
-const('INC_LIMIT', int(0.45 * 2 ** 32), '0.45 fs as a phase increment')
+const('L_CH_A1', log2q(CHAIN['a1']), 'the chain after the modes, analog prototype in s / (2 pi f0): high-pass, log2 a1')
+const('L_CH_A0', log2q(CHAIN['a0']), 'log2 a0')
+const('L_CH_B2', log2q(CHAIN['b2']), 'band s (b2 s + b1) / (s^2 + c1 s + c0): log2 b2')
+const('L_CH_B1', log2q(CHAIN['b1']), 'log2 b1')
+const('L_CH_C1', log2q(CHAIN['c1']), 'log2 c1')
+const('L_CH_C0', log2q(CHAIN['c0']), 'log2 c0')
+const('HALF_SCALE', (1 << 30) - 1, 'the output ceiling: half scale, the SDK limit')
+const('SINE_CURVE', q((2 * math.pi / 2048) ** 2 / 2), "sine(): the table's curvature, (2 pi / 2048)^2 / 2, Q31")
+const('INC_LIMIT', int(MODE_TOP * 2 ** 32), 'the modes stop at fs/4 (11 kHz) as a phase increment')
 const('INC_SIXTH', int(2 ** 32 / 7), 'modes below fs/7 keep 2 - 2 r cos th as a Q31 coefficient')
 const('INC_EIGHTH', int(2 ** 32 / 8), 'modes below fs/8 take their input once per four samples')
 const('OP2_HALF_RATE', int(round(260 / FS * 2 ** 32)), 'op2 runs at half rate while slower than this (260 Hz) as a 1x increment')
 const('INC_DROP_LIMIT', int(0.4 * 2 ** 32), 'the drop keeps the carrier below 0.4 fs (0.2 of the reference 2x rate)')
 const('INC_20HZ', int(round(20 / FS * 2 ** 32)), '20 Hz as a phase increment')
 const('L_INC_20HZ', log2q(20 / FS * 2 ** 32), 'its log2')
-const('L_INC_NY', log2q(0.45 * 2 ** 32), 'log2 of 0.45 fs as an increment')
-const('L_INC_NY09', log2q(0.9 * 0.45 * 2 ** 32), 'log2 of 0.9 x 0.45 fs')
-const('L_INC_NY01', log2q(0.1 * 0.45 * 2 ** 32), 'log2 of 0.1 x 0.45 fs')
+const('L_INC_NY', log2q(MODE_TOP * 2 ** 32), 'log2 of the top (fs/4) as an increment')
+const('L_INC_NY09', log2q(0.9 * MODE_TOP * 2 ** 32), 'log2 of 0.9 x the top: modes fade out above')
+const('L_INC_NY01', log2q(0.1 * MODE_TOP * 2 ** 32), 'log2 of 0.1 x the top')
 const('L_FS', log2q(FS), 'log2 44100')
-const('RATIO_MIN', q(0.05), 'make-up: below this RATIO the lattice is the note alone')
 const('UP_POWER', q(0.75), 'make-up for modes moved up: (ratio)^0.75')
-const('STRETCH_DEAD', q(0.01), 'STRETCH within this of the middle is none')
+const('RES_TRIM', q(RES_TRIM), 'the modes\' drive trim (RES_TRIM_DB), Q31: for the tests')
+const('STRETCH_HARM', q(STRETCH_HARM), "STRETCH within this of the middle (as 2 x - 1) is the harmonic series")
+const('STRETCH_MORPH_INV', q(1 / (0.5 - STRETCH_HARM), 29), 'harmonic to material over the rest of the first half of each side, 1 / its width, Q29')
+table('L_MAGNET', [log2q(m) for m in MAGNETS], comment="RATIO's magnets (op2 : carrier), log2, Q24")
+const('MAGNET_W', q(MAGNET_W, LOGQ), "RATIO is pulled onto a magnet within this many octaves of it, Q24")
+const('MAGNET_INV', int(2 ** 31 / (MAGNET_W * 2 ** LOGQ)), "2^31 / MAGNET_W in Q24 units: d / W as Q31")
 const('DEPTH_BITE', q(depth0 * 3 * BITE, 29), 'FM depth added by BITE at note-on, Q29')
 const('FLUSH', 4096, 'an unfed mode quieter than this (-126 dBFS at the output) is silent')
 const('KK_MAKEUP', q(1 - math.exp(-64 / (FS * 0.02))), "make-up gain easing per 64 samples (the reference's 20 ms)")
 table('L_RM', [log2q(r) for r in rm], comment="log2 of each mode's material ratio, Q24")
-table('RM_DIST', [q(abs(r - 1), 26) for r in rm], comment='|material ratio - 1|, Q26')
+table('L_H', [log2q(k + 1) for k in range(8)], comment="log2 of the harmonic series, mode k at k + 1 times the note, Q24")
+table('L_RA', [log2q(r / rm[0]) for r in rm], comment="log2 of each mode's material ratio over the first mode's (the first on the note), Q24")
 table('L_SPREAD', [q(x, LOGQ) for x in spread], comment="each mode's fixed detune, log2, Q24")
 table('L_BW', [log2q(b) for b in bw], comment="log2 of each mode's bandwidth in Hz")
 table('DAMP16', [q(p ** 16) for p in pole], comment="each mode's decay over 16 samples, r^16 (ring 3.6 s x rt), Q31")
@@ -270,7 +326,10 @@ table('L_B', lb, comment='log2 of (1 - r) 2 sqrt(r) ra RES_GAIN x wet / dry x 2^
 table('L_EPS', leps, comment='log2 of (1 - r)^2 / (4 r): with sin(th)^2, the correction sqrt(1 + eps)')
 table('L_BP', lbp, comment='log2 of RES_GAIN 2 / (Wp fs) x wet x 2^MODE_SHIFT: STRIKE into each mode, before sin th and its share sqrt(ra) edge MODES / wsum')
 table('SQRT_RA', [qs(math.sqrt(r)) for r in ra], comment='sqrt(ra), Q31: shares the strike between modes')
-table('STRIKE', [q(v) for v in strike], comment='the STRIKE pulse (raised cosine, 0.26 ms) through the fixed low-pass, in drive units, Q31; negative, as the drive drops the reference stage gain and its sign')
+table('STRIKE', [q(v) for v in strike], comment='the STRIKE pulse (raised cosine, 0.26 ms), in the core\'s units, Q31; negative, as the core drops the reference stage gain and its sign')
+assert max(max(abs(g.real), abs(g.imag)) for g in strike_g) < 3.9
+table('STRIKE_GRE', [q(g.real, 29) for g in strike_g], comment='HP EQ / (PK BAND) at a mode, real part, by log2 of its ratio to the note from -4 in 1/16 octaves, Q29')
+table('STRIKE_GIM', [q(g.imag, 29) for g in strike_g], comment='its imaginary part, Q29')
 const('DROP_SPLIT_INV', q(1 / DROP_SPLIT, 29), '1 / DROP_SPLIT, Q29')
 const('DROP_SPLIT_Q31', q(DROP_SPLIT), 'DROP_SPLIT, Q31')
 const('DROP_HI_INV', q(1 / (1 - DROP_SPLIT), 29), '1 / (1 - DROP_SPLIT), Q29')
@@ -287,6 +346,7 @@ const('L_DT_T0', log2q(dt * 1000 / t0), "log2 of 16 samples over the time lane's
 const('L_T1_T0', log2q(t1 / t0), "log2 of the time lane's end over its start")
 const('SWEEP_E', q(sweep_e - 1, 31), "DROP's shape: what is left is 1 - u^(1 + this), Q31")
 table('SINE', SINE, per=8, comment='sin, 2048 points per cycle and a guard point, Q30')
+table('SINE16', [max(-32767, min(32767, int(round(math.sin(2 * math.pi * i / 4096) * 32768)))) for i in range(4096)], ctype='opxy::i16', per=16, comment='sin, 4096 points per cycle, Q15: the FM core reads it without interpolation (phase spurs below -70 dBc)')
 table('LOG2T', LOG2T, comment='log2(1 + i/1024), Q30')
 table('EXP2T', EXP2T, ctype='u32', comment='2^(i/1024), Q30')
 table('SP2T', SP2T, comment='log2(1 + 2^-a), a = i/32, Q30')
@@ -317,7 +377,8 @@ dtable('DISPLAY_DROP_MS', [round(t0 * (t1 / t0) ** lane_pos(x, TM_MID, TM_CURVE,
        "DROP's time in ms at the knob's sixteenths, Q10")
 dtable('DISPLAY_DROP_LEFT', [round((1 - (i / 23) ** sweep_e) * 1024) for i in range(24)],
        "how much of the drop is left at 24 points through it (its fixed shape), Q10")
-dtable('DISPLAY_L_RM', [round(math.log2(r) * 1024) for r in rm], "log2 of each mode's material ratio, Q10")
+dtable('DISPLAY_L_H', [round(math.log2(k + 1) * 1024) for k in range(8)], 'log2 of the harmonic series, Q10')
+dtable('DISPLAY_L_RA', [round(math.log2(r / rm[0]) * 1024) for r in rm], "log2 of each mode's material ratio over the first mode's, Q10")
 dtable('DISPLAY_RING', [round(min(4.0, 0.9 * rt[k]) * 1024) for k in range(8)],
        "how long each mode's halo lasts on screen after a note, seconds Q10 (upper modes ring shorter)")
 dtable('DISPLAY_RING_INV', [round(65536 / min(4.0, 0.9 * rt[k])) for k in range(8)], 'its reciprocal, Q16')
@@ -327,3 +388,105 @@ print('machines/rings/tables.h written')
 print('modes: rm', [round(r, 4) for r in rm])
 print('       pole 1-r', [f'{1 - p:.3g}' for p in pole], 'strike samples', len(pulse))
 print(f'gains: drive {DRIVE_GAIN:.5f}  G2 {G2:.5f}  dry {DRY:.5f}  wet {WETG:.5f}')
+
+# ======================================================================================================================
+# rings_alt: the same voice with a tuned feedback delay for a resonator (machines/rings_alt). Its tables.h is rings'
+# (in its own namespace) plus these.
+FS2 = FS / 2                                       # the delay loop runs at half rate
+ALT_LINE = 2048                                    # delay line, half-rate samples: notes down to 11 Hz
+ALT_K = 2                                          # dispersion allpasses in the loop
+ALT_S_MAX = 0.6                                    # STRETCH at full: partial 8 at 8 x 2^0.6 (12.1) where the note allows
+ALT_P_MIN = 4.0                                    # the dispersion leaves at least this much plain delay
+
+def _argap(a, w):
+    return -w + 2 * np.arctan2(a * np.sin(w), 1 + a * np.cos(w))
+
+def alt_top(f0):
+    """The partial the stretch is aimed at: 8, or the highest below 0.45 of the loop's rate."""
+    return max(2, min(8, int(0.45 * FS2 / f0)))
+
+def alt_partial8(f0, a):
+    """Partial alt_top's ratio to the note for K allpasses of coefficient a (no low-pass), and the plain delay left."""
+    kt = alt_top(f0)
+    w0 = 2 * math.pi * f0 / FS2
+    tau = (-_argap(a, w0) / w0) if a else 0.0
+    P = 2 * math.pi / w0 - ALT_K * tau
+    if a == 0:
+        return float(kt), P
+    w = np.linspace(w0 * 0.5, math.pi * 0.999, 200000)
+    ph = -w * P + ALT_K * _argap(a, w)
+    if ph[-1] > -2 * math.pi * kt:
+        return float(kt), -1.0                     # that partial is past the loop's Nyquist: no use
+    k8 = w[np.argmin(np.abs(ph + 2 * math.pi * kt))]
+    return k8 / w0, P
+
+alt_f = [16 * 2 ** (i / 2) for i in range(17)]     # 16 Hz .. 4096 Hz, half octaves
+alt_amounts = [i / 8 for i in range(9)]
+alt_alpha = []
+_grid = [-(0.985 * i / 300) for i in range(301)]
+for f0 in alt_f:
+    curve = [(a,) + alt_partial8(f0, a) for a in _grid]
+    feasible = [(a, p8) for a, p8, P in curve if P >= ALT_P_MIN]
+    row = []
+    for s_ in alt_amounts:
+        kt = alt_top(f0)
+        target = kt * 2 ** (ALT_S_MAX * s_ * math.log2(kt) / 3)   # the same stretch exponent as partial 8's
+        hit = [a for a, p8 in feasible if p8 >= target]
+        if s_ == 0 or not feasible:
+            row.append(0.0)
+        elif hit:
+            row.append(max(hit))                    # the weakest that reaches it
+        else:
+            row.append(max(feasible, key=lambda t: t[1])[0])   # as far as the note allows
+    alt_alpha.append(row)
+
+def atan_phase(t):
+    return math.atan(t) / (2 * math.pi) * 2 ** 32
+
+alt = []
+def aconst(name, value, comment):
+    alt.append(f'const i32 {name} = {value};{" " * max(1, 34 - len(name) - len(str(value)))}// {comment}')
+def atable(name, values, comment=''):
+    alt.append('// ' + comment)
+    alt.append(f'const i32 {name}[{len(values)}] = {{')
+    for i in range(0, len(values), 8):
+        alt.append('    ' + ', '.join(str(v) for v in values[i:i + 8]) + ',')
+    alt.append('};')
+alt.append('// ---- rings_alt: the delay loop')
+aconst('ALT_LINE', ALT_LINE, 'delay line length, half-rate samples (a power of two)')
+aconst('ALT_P_MIN_Q16', int(ALT_P_MIN * 65536), 'the plain delay the dispersion leaves, at least, Q16 samples')
+aconst('L_24', log2q(24), 'log2 24: TONE at zero, D = 8, makes the 4th harmonic lose 3 D = 24 times the note\'s loss more')
+aconst('ALT_C_MAX', q(0.95), 'the loop low-pass pole at most')
+aconst('ALT_SPAN_INV', q(1 / (1 - STRETCH_HARM), 29), 'STRETCH beyond the harmonic middle, over the rest of each half: 1 / its width, Q29')
+atable('ATAN', [int(round(atan_phase(i / 256))) for i in range(257)], 'atan(i / 256) as a phase, 2^32 per cycle')
+atable('ALT_ALPHA', [q(a) for row in alt_alpha for a in row],
+       'dispersion allpass coefficient, Q31, by note (16 Hz x 2^(i/2), 17 rows) and STRETCH amount (0..1 in eighths, 9 columns)')
+aconst('ALT_L_F0', log2q(16 / FS * 2 ** 32), "log2 of the first row's note (16 Hz) as a 1x phase increment, Q24")
+aconst('ALT_L_R', log2q(pole[0]), 'log2 of the first mode\'s pole radius per sample (its ring time), Q24: the loop decays as it')
+# levels: the loop's input is scaled so its fundamental peaks at the first mode's level; the strike rings it
+ALT_IN_GAIN, ALT_STRIKE_GAIN = 1.4, 6.0
+aconst('ALT_IN', q(ALT_IN_GAIN, 27), "the drive into the loop over (1 - g): the note's resonance peak, Q27")
+aconst('ALT_STRIKE', q(ALT_STRIKE_GAIN, 27), 'STRIKE into the loop, Q27')
+alt_text = '\n'.join(out[:-1]).replace('namespace rings {', 'namespace rings_alt {') + '\n' + '\n'.join(alt) + '\n}\n'
+alt_text = alt_text.replace('// Generated by tools/gen_tables.py from the float reference engine. Do not edit.',
+                            '// Generated by tools/gen_tables.py (rings\' tables, then the delay loop\'s). Do not edit.')
+Path('machines/rings_alt').mkdir(exist_ok=True)
+Path('machines/rings_alt/tables.h').write_text(alt_text)
+print('alt alpha (rows 16 Hz.. by half octave; columns stretch 0..1):')
+for f0, row in zip(alt_f, alt_alpha):
+    print(f'  {f0:7.1f} Hz', ' '.join(f'{a:6.3f}' for a in row), ' top partial %d at full: %.2f' % (alt_top(f0), alt_partial8(f0, row[-1])[0]))
+
+# rings_alt's display tables: rings' (in its namespace) plus where the partials sit at 256 Hz for each STRETCH amount
+def alt_partials(f0, a, n=8):
+    w0 = 2 * math.pi * f0 / FS2
+    tau = (-_argap(a, w0) / w0) if a else 0.0
+    P = 2 * math.pi / w0 - ALT_K * tau
+    w = np.linspace(w0 * 0.5, math.pi * 0.999, 200000)
+    ph = -w * P + (ALT_K * _argap(a, w) if a else 0)
+    return [w[np.argmin(np.abs(ph + 2 * math.pi * k))] / w0 for k in range(1, n + 1)]
+_row = alt_alpha[alt_f.index(256.0)]
+alt_disp = [round(math.log2(r) * 1024) for a in _row for r in alt_partials(256.0, a)]
+dalt = d[:-1] + ["// where the loop's 8 partials sit at 256 Hz, log2 of their ratio to the note, Q10, by STRETCH amount (0..1 in eighths)",
+                 f'const opxy::i32 DISPLAY_ALT_P[{len(alt_disp)}] = {{'] + \
+       ['    ' + ', '.join(str(v) for v in alt_disp[i:i + 8]) + ',' for i in range(0, len(alt_disp), 8)] + ['};', '}']
+Path('machines/rings_alt/display_tables.h').write_text('\n'.join(dalt).replace('namespace rings {', 'namespace rings_alt {') + '\n')
