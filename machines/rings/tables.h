@@ -33,6 +33,7 @@ const i32 INC_PRESENCE_RATIO = 4;               // presence peak at 4x the note
 const i32 INC_SHELF_RATIO = 6;                  // high shelf at 6x the note
 const i32 INC_LIMIT = 1932735283;               // 0.45 fs as a phase increment
 const i32 INC_SIXTH = 613566756;                // modes below fs/7 keep 2 - 2 r cos th as a Q31 coefficient
+const i32 INC_EIGHTH = 536870912;               // modes below fs/8 take their input once per four samples
 const i32 OP2_HALF_RATE = 25321803;             // op2 runs at half rate while slower than this (260 Hz) as a 1x increment
 const i32 INC_DROP_LIMIT = 1717986918;          // the drop keeps the carrier below 0.4 fs (0.2 of the reference 2x rate)
 const i32 INC_20HZ = 1947831;                   // 20 Hz as a phase increment

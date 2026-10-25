@@ -5,7 +5,7 @@ namespace rings {
 using opxy::i32;
 using opxy::u32;
 
-const unsigned MODES = 8;
+const unsigned MODES = 4;              // the reference's first four modes: MODES runs 1..4 (README)
 
 // One direct-form-I biquad's history.
 struct Biquad { i32 x1, x2, y1, y2; };
@@ -34,6 +34,7 @@ struct Voice {
     // filters, direct form I, and the low-pass FIR's last four inputs
     Biquad hp1, pk, hp2, hs;
     i32 fir[2];
+    i32 drive_last;          // the drive's last sample: the sums by four reach back one
     i32 hp_c[2];             // high-passes: 2 + a1, 1 - a2
     i32 hp_lb0;              // log2 of the high-passes' b0 (they run unnormalised; the shelf carries it)
     i32 pk_c[3];             // presence band-pass: (A^2 - 1) b0, 2 + a1, 1 - a2
@@ -42,6 +43,7 @@ struct Voice {
     i32 y1[MODES], y2[MODES];
     i32 mc[MODES];           // below fs/7: 2 - 2 cos th, Q31; above: 2 cos th, Q30
     i32 lch[MODES];          // log2 cos(th / 2), Q24
+    i32 lcos[MODES];         // log2 cos th, Q24 (modes below fs/8)
     i32 b[MODES];            // drive into each mode, Q31
     i32 sn[MODES];           // sin th, Q31
     i32 edge[MODES];         // fade near 20 Hz and 0.45 fs, Q31
@@ -51,6 +53,7 @@ struct Voice {
     i32 lrr[MODES];          // log2 of the mode's ratio to the note (material, STRETCH, spread), Q24
     i32 mk[MODES], mk_target[MODES];   // make-up gain, Q25
     u32 high;                // bit k: mode k is above fs/7
+    u32 quad;                // bit k: mode k is below fs/8 (input once per four samples)
     u32 gx_dirty;
 };
 // rings voices share nothing.
