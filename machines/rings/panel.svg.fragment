@@ -1,20 +1,39 @@
 <g id="rings_panel">
-  <path id="rings_node_0" d="M-32 -32 L-28 -32 L-24 -32 L-20 -32 L-16 -32 L-12 -32 L-8 -32 L-4 -32 L0 -32 L4 -32 L8 -32 L12 -32 L16 -32 L20 -32 L24 -32 L28 -32 L32 -32 L32 -28 L32 -24 L32 -20 L32 -16 L32 -12 L32 -8 L32 -4 L32 0 L32 4 L32 8 L32 12 L32 16 L32 20 L32 24 L32 28 L32 32 L28 32 L24 32 L20 32 L16 32 L12 32 L8 32 L4 32 L0 32 L-4 32 L-8 32 L-12 32 L-16 32 L-20 32 L-24 32 L-28 32 L-32 32 L-32 28 L-32 24 L-32 20 L-32 16 L-32 12 L-32 8 L-32 4 L-32 0 L-32 -4 L-32 -8 L-32 -12 L-32 -16 L-32 -20 L-32 -24 L-32 -28 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
-  <path id="rings_node_1" d="M-32 -32 L-28 -32 L-24 -32 L-20 -32 L-16 -32 L-12 -32 L-8 -32 L-4 -32 L0 -32 L4 -32 L8 -32 L12 -32 L16 -32 L20 -32 L24 -32 L28 -32 L32 -32 L32 -28 L32 -24 L32 -20 L32 -16 L32 -12 L32 -8 L32 -4 L32 0 L32 4 L32 8 L32 12 L32 16 L32 20 L32 24 L32 28 L32 32 L28 32 L24 32 L20 32 L16 32 L12 32 L8 32 L4 32 L0 32 L-4 32 L-8 32 L-12 32 L-16 32 L-20 32 L-24 32 L-28 32 L-32 32 L-32 28 L-32 24 L-32 20 L-32 16 L-32 12 L-32 8 L-32 4 L-32 0 L-32 -4 L-32 -8 L-32 -12 L-32 -16 L-32 -20 L-32 -24 L-32 -28 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
-  <circle id="rings_palette_0" cx="640" cy="0" r="1" fill="#000000" stroke="#000000" stroke-width="1"/>
-  <circle id="rings_palette_1" cx="640" cy="0" r="1" fill="#111111" stroke="#111111" stroke-width="1"/>
-  <circle id="rings_palette_2" cx="640" cy="0" r="1" fill="#222222" stroke="#222222" stroke-width="1"/>
-  <circle id="rings_palette_3" cx="640" cy="0" r="1" fill="#333333" stroke="#333333" stroke-width="1"/>
-  <circle id="rings_palette_4" cx="640" cy="0" r="1" fill="#444444" stroke="#444444" stroke-width="1"/>
-  <circle id="rings_palette_5" cx="640" cy="0" r="1" fill="#555555" stroke="#555555" stroke-width="1"/>
-  <circle id="rings_palette_6" cx="640" cy="0" r="1" fill="#666666" stroke="#666666" stroke-width="1"/>
-  <circle id="rings_palette_7" cx="640" cy="0" r="1" fill="#777777" stroke="#777777" stroke-width="1"/>
-  <circle id="rings_palette_8" cx="640" cy="0" r="1" fill="#888888" stroke="#888888" stroke-width="1"/>
-  <circle id="rings_palette_9" cx="640" cy="0" r="1" fill="#999999" stroke="#999999" stroke-width="1"/>
-  <circle id="rings_palette_10" cx="640" cy="0" r="1" fill="#aaaaaa" stroke="#aaaaaa" stroke-width="1"/>
-  <circle id="rings_palette_11" cx="640" cy="0" r="1" fill="#bbbbbb" stroke="#bbbbbb" stroke-width="1"/>
-  <circle id="rings_palette_12" cx="640" cy="0" r="1" fill="#cccccc" stroke="#cccccc" stroke-width="1"/>
-  <circle id="rings_palette_13" cx="640" cy="0" r="1" fill="#dddddd" stroke="#dddddd" stroke-width="1"/>
-  <circle id="rings_palette_14" cx="640" cy="0" r="1" fill="#eeeeee" stroke="#eeeeee" stroke-width="1"/>
-  <circle id="rings_palette_15" cx="640" cy="0" r="1" fill="#ffffff" stroke="#ffffff" stroke-width="1"/>
+  <rect x="0" y="25" width="480" height="195" fill="#000000"/>
+  <!-- DROP: 64 distinct points (M, 63 L, Z); the frame reshapes them. -->
+  <path id="rings_node_0" transform="matrix(1 0 0 1 640 320)" d="M-56,0 L-52.5,0 L-49,0 L-45.5,0 L-42,0 L-38.5,0 L-35,0 L-31.5,0 L-28,0 L-24.5,0 L-21,0 L-17.5,0 L-14,0 L-10.5,0 L-7,0 L-3.5,0 L0,0 L3.5,0 L7,0 L10.5,0 L14,0 L17.5,0 L21,0 L24.5,0 L28,0 L31.5,0 L35,0 L38.5,0 L42,0 L45.5,0 L49,0 L52.5,0 L52.5,1 L49,1 L45.5,1 L42,1 L38.5,1 L35,1 L31.5,1 L28,1 L24.5,1 L21,1 L17.5,1 L14,1 L10.5,1 L7,1 L3.5,1 L0,1 L-3.5,1 L-7,1 L-10.5,1 L-14,1 L-17.5,1 L-21,1 L-24.5,1 L-28,1 L-31.5,1 L-35,1 L-38.5,1 L-42,1 L-45.5,1 L-49,1 L-52.5,1 L-56,1 Z" fill="none" stroke="#909090" stroke-width="0.8" stroke-linejoin="round"/>
+  <!-- The eight modes, then their halos. -->
+  <circle id="rings_node_1" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="#000000" stroke="#909090" stroke-width="1.2"/>
+  <circle id="rings_node_2" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="#000000" stroke="#909090" stroke-width="1.2"/>
+  <circle id="rings_node_3" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="#000000" stroke="#909090" stroke-width="1.2"/>
+  <circle id="rings_node_4" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="#000000" stroke="#909090" stroke-width="1.2"/>
+  <circle id="rings_node_5" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="#000000" stroke="#909090" stroke-width="1.2"/>
+  <circle id="rings_node_6" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="#000000" stroke="#909090" stroke-width="1.2"/>
+  <circle id="rings_node_7" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="#000000" stroke="#909090" stroke-width="1.2"/>
+  <circle id="rings_node_8" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="#000000" stroke="#909090" stroke-width="1.2"/>
+  <circle id="rings_node_9" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="none" stroke="#909090" stroke-width="0.8"/>
+  <circle id="rings_node_10" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="none" stroke="#909090" stroke-width="0.8"/>
+  <circle id="rings_node_11" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="none" stroke="#909090" stroke-width="0.8"/>
+  <circle id="rings_node_12" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="none" stroke="#909090" stroke-width="0.8"/>
+  <circle id="rings_node_13" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="none" stroke="#909090" stroke-width="0.8"/>
+  <circle id="rings_node_14" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="none" stroke="#909090" stroke-width="0.8"/>
+  <circle id="rings_node_15" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="none" stroke="#909090" stroke-width="0.8"/>
+  <circle id="rings_node_16" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="10" fill="none" stroke="#909090" stroke-width="0.8"/>
+  <!-- Palette donors stay off screen. -->
+  <circle id="rings_palette_0" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#000000" stroke="#000000" stroke-width="1.2"/>
+  <circle id="rings_palette_1" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#080808" stroke="#111111" stroke-width="1.2"/>
+  <circle id="rings_palette_2" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#0F0F0F" stroke="#222222" stroke-width="1.2"/>
+  <circle id="rings_palette_3" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#171717" stroke="#333333" stroke-width="1.2"/>
+  <circle id="rings_palette_4" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#1F1F1F" stroke="#444444" stroke-width="1.2"/>
+  <circle id="rings_palette_5" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#262626" stroke="#555555" stroke-width="1.2"/>
+  <circle id="rings_palette_6" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#2E2E2E" stroke="#666666" stroke-width="1.2"/>
+  <circle id="rings_palette_7" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#363636" stroke="#777777" stroke-width="1.2"/>
+  <circle id="rings_palette_8" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#3D3D3D" stroke="#888888" stroke-width="1.2"/>
+  <circle id="rings_palette_9" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#454545" stroke="#999999" stroke-width="1.2"/>
+  <circle id="rings_palette_10" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#4C4C4C" stroke="#AAAAAA" stroke-width="1.2"/>
+  <circle id="rings_palette_11" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#545454" stroke="#BBBBBB" stroke-width="1.2"/>
+  <circle id="rings_palette_12" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#5C5C5C" stroke="#CCCCCC" stroke-width="1.2"/>
+  <circle id="rings_palette_13" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#636363" stroke="#DDDDDD" stroke-width="1.2"/>
+  <circle id="rings_palette_14" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#6B6B6B" stroke="#EEEEEE" stroke-width="1.2"/>
+  <circle id="rings_palette_15" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#737373" stroke="#FFFFFF" stroke-width="1.2"/>
 </g>

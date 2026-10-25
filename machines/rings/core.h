@@ -23,11 +23,10 @@ struct Voice {
     i32 sweep_du;            // Q31: how far through the drop 16 samples go
     u32 sweep_j;             // 16-sample steps since note-on
     i32 sweep_u;             // Q31: how far through the drop (MAX: done)
-    // FM core, at 2x
+    // FM core
     u32 ph0, ph2, inc_prev;
     i32 s2p, l1, l2;
     i32 bite;                // Q31: BITE still to come, 1 at note-on
-    i32 hx[4], hy[4];        // half-band
     // the onset: the reference's 3 ms eased attack; the stock amp envelope does the rest
     i32 gain;                // Q31 gain after the last 16 samples (sqrt of the level)
     i32 att_u, att_g0;
