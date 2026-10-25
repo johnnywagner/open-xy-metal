@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "sdk": "1.1",
+  "kind": "synth",
+  "description": "Rings",
+  "identity": {
+    "engine": 36,
+    "page": 84
+  }
+}

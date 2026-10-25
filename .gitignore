@@ -1,0 +1,3 @@
+# Previews and builds belong outside machine folders.
+*.exe
+__pycache__/
