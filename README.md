@@ -7,25 +7,25 @@ division or 64-bit arithmetic in the render path. Its algorithm is checked again
 stage. Since the port, its knob mappings have been made more tonal (Controls), so it no longer matches the reference
 note for note.
 
-Three variants sit beside it:
+The machines here now are **rings2** and two tuned versions of it. rings itself (the tonal mappings), the
+delay-loop version (rings3, once `ringsalt`) and the STRETCH-stops version (rings4) were tried and removed; they are in
+the git history (`git show 4669bc6` and `129c5a5`). The engine sections below (Controls to Design notes) were written
+for rings and describe the engine all three share; rings2's own section says where its knobs differ.
 
-- **rings2** ([machines/rings2](machines/rings2)) is rings with the reference's own mode tuning, before the tonal
-  mappings: the modes at the material's ratios (the first below the note), RATIO free, and the reference's make-up.
-  More atonal and metallic; otherwise the same engine and CPU (rings2, below).
-- **rings4** ([machines/rings4](machines/rings4)) is rings2 with STRETCH as a path through resonator shapes:
-  squeezed, drum, bell, material, stretched and bar, flat at each stop and gliding mode by mode between (rings4, below).
-- **rings3** ([machines/rings3](machines/rings3)) is the same voice with a tuned feedback delay for a resonator
-  instead of eight modes: harmonic, cheaper, and a place to try other ideas (rings3, below). It was `ringsalt` and,
-  before that, `rings_alt`.
+- **rings2** ([machines/rings2](machines/rings2)) is the port with the reference's own mode tuning: the modes at the
+  material's ratios (the first below the note), STRETCH as ratio^(2^(2 x - 1)), RATIO free, and the reference's
+  make-up. Atonal and metallic (rings2, below).
+- **rings5** ([machines/rings5](machines/rings5)) is rings2 with its four lowest modes tuned onto consonant intervals
+  of the note, the four above left free (rings5 and rings6, below).
+- **rings6** ([machines/rings6](machines/rings6)) is rings2 with every mode tuned onto the nearest semitone of the
+  note.
 
 | Folder | What |
 | --- | --- |
-| [machines/rings](machines/rings) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
-| [machines/rings2](machines/rings2) | rings with the reference's mode tuning: the same files, its own `set_stretch`, make-up, page and `tests/sound.cpp` |
-| [machines/rings4](machines/rings4) | rings2 with STRETCH's stops: its own `spot_map`, page and `tests/sound.cpp` |
-| [machines/rings3](machines/rings3) | The delay-loop version: the same files, its own `engine.cpp`, `core.h` and page, and its test `tests/loop.cpp` |
+| [machines/rings2](machines/rings2) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
+| [machines/rings5](machines/rings5), [machines/rings6](machines/rings6) | rings2 tuned: the same files with `tune` and `stretch_map` in `engine.cpp`, `TUNE_MASK` in `tables.h`, and the tuned map in the page and test |
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
-| [tools/gen_tables.py](tools/gen_tables.py) | Generates the four machines' `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
+| [tools/gen_tables.py](tools/gen_tables.py) | Generates the three machines' `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
 | [tools/probe.c](tools/probe.c) | The float reference with every stage exposed, for levels and debugging |
 
@@ -163,66 +163,39 @@ the modes stopping at 11 kHz, +12 dB). Its knobs read as rings':
 - Its test is rings' `tests/sound.cpp` with the reference's tuning and make-up in the model: every stage at least
   55 dB against it.
 
-## rings4
+## rings5 and rings6
 
-rings2 (its engine, free RATIO and the reference's make-up) with STRETCH as a path through six resonator shapes. Four
-are the reference's own material tables (rings.c, MODAL_TAB) and rings2's material at three stretches:
+rings2 tuned. STRETCH places the modes exactly as rings2 does; then modes move onto pitches of the note, in 12-TET
+counted from the note, and the small fixed detune goes back on. The rest is rings2: engine, make-up, level and CPU.
 
-| STRETCH | Stop | Mode ratios to the note |
-| --- | --- | --- |
-| -100 | Cluster: rings2's material squeezed (rings2 at -100) | 0.73 .. 2.24 |
-| -60 | Drum: a circular membrane | 1, 1.59, 2.14, 2.30, 2.65, 2.92, 3.16, 3.50 |
-| -25 | Bell: hum, prime, minor third, fifth, nominal ... | 0.5, 1, 1.2, 1.5, 2, 2.5, 3, 4 |
-| 0 | Material (rings2 at 0) | 0.54 .. 5.03 |
-| +65 | Stretched (rings2 at +100, its default) | 0.29 .. 25.3 |
-| +100 | Bar: a free bar (marimba, vibraphone) | 1, 2.76, 5.40, 8.93, 13.3, 18.6, 24.8, 31.9 |
-
-- Each stop holds for 4 either side; between stops every mode glides in log2 from one shape to the next on a
-  smoothstep, with the reference's small fixed detune throughout.
-- Drum and bar put their first mode on the note, where it catches the FM's fundamental: they are trimmed 7 dB, which
-  brings every stop within about 2 dB of the others.
-- **Presets:** **Rings 4** (stretched), **Cluster**, **Drum**, **Bell**, **Material**, **Bar**, **All modes** and **Fall**.
-- CPU as rings2; its test is rings2's with the stops in the model (`spot_map`).
-
-## rings3
-
-The same FM core, onset, chain and level, with one tuned feedback delay instead of the eight modes. It rings every
-harmonic of the note at once, so its cost does not grow with them. It runs at half rate (partials up to 11 kHz, as the
-modes) and is interpolated back as the half-rate modes are.
-
-| Encoder | Control | Readout |
-| --- | --- | --- |
-| 1, 2 | DROP, RATIO: as rings (RATIO's magnets too) | |
-| 3 | STRETCH: harmonic in the middle (within 6 of 0). Right: stiffer, the partials stretch up, partial 8 up to 12 times the note (8.4 to 12 depending on the note; less above 1 kHz). Left: hollow, the even harmonics fade out, odd only at -100 | -100..+100 |
-| 4 | TONE: how long the upper harmonics ring. 100: as long as the note; 0: the 4th harmonic dies 25 times as fast | 0..100 |
-
-- **The loop:** a 2048-sample line, read through a first-order allpass fractional delay, two first-order dispersion
-  allpasses (STRETCH right; their coefficient from a table by note and amount, so the stretch is about the same at
-  every note), a one-pole low-pass designed per note for TONE that also carries the loss, then the drive and STRIKE.
-  STRETCH left mixes in a second tap at half the period, inverted, which cancels the even harmonics.
-- **Tuning** takes the phase delays of the low-pass, the dispersion and the fractional allpass at the note into
-  account (table atan): within 1 cent from C1 to C7 at every setting (`tests/loop.cpp`).
-- **Ring time:** the note rings as rings' first mode does; the drive is scaled so the note's resonance peaks at the
-  same level at every pitch. Notes below 11 Hz go up an octave.
-- **Presets:** **Rings 3** (harmonic, TONE 60), **Stiff**, **Hollow**, **Dark** and **Fall**.
-- Pitch bends retune the loop in steps (each 3.4 cents or more); a big bend can click.
+- **rings5, Tuned:** the four lowest modes go to the nearest consonant interval of the note: unison and octaves,
+  minor and major thirds, fourth, fifth, minor and major sixths (never a second, tritone or seventh). The four above
+  stay where rings2 puts them. A tuned body under rings2's metal, as tuned percussion is made: the low partials tuned,
+  the rest left to the material. At the default MODES (2) every mode that sounds is tuned.
+- **rings6, Chromatic:** every mode goes to the nearest semitone of the note. Every partial is in tune with 12-TET,
+  including the dissonant ones (seconds, tritones, sevenths): rings2's metal, quantized.
+- **STRETCH** steps the tuned modes semitone by semitone as it turns, where rings2 glides. At STRETCH 0 (the
+  material), rings2's modes sit at -10.7, +1.9, +6.0 and +10.4 semitones from the note; rings5 puts them at -12, +3,
+  +7 and +9, rings6 at -11, +2, +6 and +10.
+- Tuning moves no mode more than half a semitone (rings6) or a semitone and a half (rings5), so levels stay with
+  rings2's at every STRETCH: no trim.
+- Each test is rings2's with the tuned map in the model (`stretch_map`).
 
 ## CPU
 
 Counting instructions per voice block with the Q31 multiply as the one instruction it is on the Blackfin (valgrind,
 the most repeatable figure here), at 440 Hz as the SDK times it:
 
-| Setting | rings | rings2 | rings3 | rings, 4 modes (before) | 2op FM |
+| Setting | rings2 | rings5, rings6 | rings (removed) | rings3 (removed) | 2op FM |
 | --- | --- | --- | --- | --- | --- |
-| The defaults | 10,900 | 10,900 | 9,700 | 13,700 | 5,600 |
-| The heaviest knob of the SDK's sweep | 13,900 (MODES 8) | 14,200 (MODES 8) | 10,600 (RATIO up) | 16,500 | |
-| The heaviest across pitches | 16,200 (harmonic, 8 modes, about 1 kHz) | | 10,600 (any pitch) | | |
+| The defaults | 10,900 | 10,800 | 10,900 | 9,700 | 5,600 |
+| The heaviest knob of the SDK's sweep | 14,200 (MODES 8) | 14,100 (MODES 8) | 13,900 (MODES 8) | 10,600 (RATIO up) | |
 
 Stopping the modes at 11 kHz saves most at high notes (about 15 to 20% at C6 and C7). A note-on block costs about
 31,700 once in rings (the set-up of eight modes and the strike).
 
-`sdk.py test` estimates **about 22,000 to 28,500 Blackfin instructions per voice block for rings and rings2** and
-**16,000 to 20,000 for rings3** at their heaviest settings; 2op FM reads about 14,000. The estimate times the host, where the SDK's
+`sdk.py test` estimates **about 22,000 to 30,000 Blackfin instructions per voice block for rings2, rings5 and
+rings6** at their heaviest settings; 2op FM reads about 14,000. The estimate times the host, where the SDK's
 portable Q31 multiply takes a dozen instructions and an unpredictable branch, so it overstates multiply-heavy engines
 such as these, and it varies by a fifth between runs here. The aim is 15,000, and above 24,000 audio may drop with
 several voices. No device measurement has been made.
