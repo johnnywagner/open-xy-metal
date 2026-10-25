@@ -1,4 +1,4 @@
-// ringsalt's own checks, compiled for the host and run by `python ../open-xy/sdk.py test --machine machines/ringsalt`:
+// rings3's own checks, compiled for the host and run by `python ../open-xy/sdk.py test --machine machines/rings3`:
 //   - the loop's tuning: an impulse into the tuned loop alone, its fundamental found by a Goertzel scan, within 2 cents of
 //     the note, from C1 to C7, across STRETCH and TONE;
 //   - odd harmonics only with STRETCH at the left: the 2nd harmonic at least 30 dB under the 3rd;
@@ -8,7 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-using namespace ringsalt;
+using namespace rings3;
 
 static i32 word(double k) { return static_cast<i32>(std::floor(k * 2147483647.0 + 0.5)); }
 static u32 inc_for(double hz) { return static_cast<u32>(hz / 44100.0 * 4294967296.0); }

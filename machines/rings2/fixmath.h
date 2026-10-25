@@ -1,11 +1,11 @@
-// Fixed-point helpers for ringsalt (as rings): Q31 multiply, shifts, and table-based sine, log2, exp2 and softplus. Every
+// Fixed-point helpers for rings: Q31 multiply, shifts, and table-based sine, log2, exp2 and softplus. Every
 // transcendental the voice needs is made of these, so the render path holds no float, no division and no 64-bit
 // arithmetic. log2 values are Q24 (LOGQ).
 #pragma once
 #include <opxy/q31.hpp>
 #include "tables.h"
 
-namespace ringsalt {
+namespace rings2 {
 
 const i32 MAX = opxy::q31::maximum;
 const i32 ONE_LOG = 1 << 24;      // 1.0 in a Q24 log2 value

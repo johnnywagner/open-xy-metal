@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "id": "ringsalt",
-  "name": "Rings Alt",
+  "id": "rings3",
+  "name": "Rings 3",
   "parameters": [
     {
       "id": "drop",
@@ -49,7 +49,7 @@
     }
   ],
   "presets": {
-    "Rings Alt": {
+    "Rings 3": {
       "drop": 0,
       "ratio": 0.08855468749999998,
       "stretch": 0.5,

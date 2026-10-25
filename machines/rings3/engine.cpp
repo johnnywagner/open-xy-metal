@@ -1,4 +1,4 @@
-// ringsalt: rings' voice (the FM exciter that drops onto each note, its chain and onset) with a tuned feedback
+// rings3: rings' voice (the FM exciter that drops onto each note, its chain and onset) with a tuned feedback
 // delay for a resonator instead of eight modes: all the note's harmonics at once, for a fixed cost.
 //
 // Per 64-sample block:
@@ -16,7 +16,7 @@
 #include "core.h"
 #include "fixmath.h"
 
-namespace ringsalt {
+namespace rings3 {
 namespace {
 
 const unsigned STEP = 16;               // the reference's sub-block
@@ -451,4 +451,4 @@ inline void render(Voice& voice, Shared&, u32, opxy::Output output, opxy::Parame
     process(voice, output, parameters, pitch, static_cast<Taps*>(0));
 }
 
-} // namespace ringsalt
+} // namespace rings3
