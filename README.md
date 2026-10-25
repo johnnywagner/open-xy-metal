@@ -115,8 +115,8 @@ The 2x-core version and the first 1x version are earlier commits.
 
 | Setting | Now | Before simplifying |
 | --- | --- | --- |
-| The defaults (2 modes) | about 18,000 | about 45,000 |
-| Heaviest: MODES at 8 | about 33,000 | about 59,000 |
+| The defaults (2 modes) | about 18,000 | about 37,000 |
+| Heaviest: MODES at 8 | about 33,000 | about 53,000 to 63,000 |
 
 The aim is 15,000, and above 24,000 audio may drop with several voices; 2op FM reads 11,000 to 15,000 in the same
 runs. Each mode adds about 2,400, and the rest of the voice is about 13,000. Counting instructions with the Q31
