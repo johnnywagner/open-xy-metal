@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "id": "rings",
+  "name": "Rings",
+  "parameters": [
+    {
+      "id": "drop",
+      "label": "Drop",
+      "default": 0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "ratio",
+      "label": "Ratio",
+      "default": 0.08855468749999998,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "stretch",
+      "label": "Stretch",
+      "default": 1,
+      "mapping": {
+        "kind": "linear",
+        "minimum": -1,
+        "maximum": 1
+      },
+      "display": "bipolar"
+    },
+    {
+      "id": "modes",
+      "label": "Modes",
+      "default": 0.14269531250000003,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 1,
+        "maximum": 8
+      },
+      "display": "ratio"
+    }
+  ],
+  "presets": {},
+  "resources": {
+    "voiceBytes": 604,
+    "voiceAlignment": 4,
+    "voiceCapacity": 8,
+    "sharedBytes": 0,
+    "outputPeakQ31": 402653184,
+    "display": {
+      "stateBytes": 4,
+      "stateAlignment": 4,
+      "paths": 2,
+      "points": 64,
+      "nodes": 2,
+      "texts": 0,
+      "palette": 16
+    }
+  }
+}

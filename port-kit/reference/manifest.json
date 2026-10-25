@@ -1,0 +1,269 @@
+{
+ "engine": "rings v69 float reference (engine/rings.c)",
+ "sample_rate": 44100,
+ "format": "mono float32 WAV",
+ "gain": 100,
+ "note_off": "never (OP-XY semantics: the stock amp envelope follows the voice)",
+ "defaults": {
+  "note": 48,
+  "drop": 0,
+  "ratio": 0.08855468749999998,
+  "stretch": 1,
+  "modes": 0.14269531250000003,
+  "attack": 0,
+  "decay": 0.6193554687499998,
+  "sustain": 0,
+  "release": 0.64740234375
+ },
+ "renders": [
+  {
+   "file": "renders/default_C2.wav",
+   "args": "secs=3 note=36",
+   "knobs_changed": {
+    "note": 36
+   },
+   "peak": 0.07058,
+   "rms": 0.00749
+  },
+  {
+   "file": "renders/default_C3.wav",
+   "args": "secs=3",
+   "knobs_changed": {},
+   "peak": 0.04384,
+   "rms": 0.00452
+  },
+  {
+   "file": "renders/default_C4.wav",
+   "args": "secs=3 note=60",
+   "knobs_changed": {
+    "note": 60
+   },
+   "peak": 0.04873,
+   "rms": 0.00461
+  },
+  {
+   "file": "renders/default_C5.wav",
+   "args": "secs=3 note=72",
+   "knobs_changed": {
+    "note": 72
+   },
+   "peak": 0.04957,
+   "rms": 0.00454
+  },
+  {
+   "file": "renders/drop_025.wav",
+   "args": "secs=3 drop=0.25",
+   "knobs_changed": {
+    "drop": 0.25
+   },
+   "peak": 0.04169,
+   "rms": 0.00468
+  },
+  {
+   "file": "renders/drop_053.wav",
+   "args": "secs=3 drop=0.533",
+   "knobs_changed": {
+    "drop": 0.533
+   },
+   "peak": 0.04204,
+   "rms": 0.00467
+  },
+  {
+   "file": "renders/drop_075.wav",
+   "args": "secs=3 drop=0.75",
+   "knobs_changed": {
+    "drop": 0.75
+   },
+   "peak": 0.04005,
+   "rms": 0.00459
+  },
+  {
+   "file": "renders/drop_100.wav",
+   "args": "secs=3 drop=1",
+   "knobs_changed": {
+    "drop": 1
+   },
+   "peak": 0.03725,
+   "rms": 0.0043
+  },
+  {
+   "file": "renders/ratio_000.wav",
+   "args": "secs=3 ratio=0",
+   "knobs_changed": {
+    "ratio": 0
+   },
+   "peak": 0.04501,
+   "rms": 0.00471
+  },
+  {
+   "file": "renders/ratio_025.wav",
+   "args": "secs=3 ratio=0.25",
+   "knobs_changed": {
+    "ratio": 0.25
+   },
+   "peak": 0.04256,
+   "rms": 0.0048
+  },
+  {
+   "file": "renders/ratio_050.wav",
+   "args": "secs=3 ratio=0.5",
+   "knobs_changed": {
+    "ratio": 0.5
+   },
+   "peak": 0.07213,
+   "rms": 0.00459
+  },
+  {
+   "file": "renders/ratio_100.wav",
+   "args": "secs=3 ratio=1",
+   "knobs_changed": {
+    "ratio": 1
+   },
+   "peak": 0.0876,
+   "rms": 0.00495
+  },
+  {
+   "file": "renders/stretch_000.wav",
+   "args": "secs=3 stretch=0",
+   "knobs_changed": {
+    "stretch": 0
+   },
+   "peak": 0.04634,
+   "rms": 0.00601
+  },
+  {
+   "file": "renders/stretch_025.wav",
+   "args": "secs=3 stretch=0.25",
+   "knobs_changed": {
+    "stretch": 0.25
+   },
+   "peak": 0.05427,
+   "rms": 0.00588
+  },
+  {
+   "file": "renders/stretch_050.wav",
+   "args": "secs=3 stretch=0.5",
+   "knobs_changed": {
+    "stretch": 0.5
+   },
+   "peak": 0.0575,
+   "rms": 0.00551
+  },
+  {
+   "file": "renders/stretch_075.wav",
+   "args": "secs=3 stretch=0.75",
+   "knobs_changed": {
+    "stretch": 0.75
+   },
+   "peak": 0.04786,
+   "rms": 0.00512
+  },
+  {
+   "file": "renders/modes_000.wav",
+   "args": "secs=3 modes=0",
+   "knobs_changed": {
+    "modes": 0
+   },
+   "peak": 0.03805,
+   "rms": 0.00408
+  },
+  {
+   "file": "renders/modes_021.wav",
+   "args": "secs=3 modes=0.2143",
+   "knobs_changed": {
+    "modes": 0.2143
+   },
+   "peak": 0.04071,
+   "rms": 0.00421
+  },
+  {
+   "file": "renders/modes_050.wav",
+   "args": "secs=3 modes=0.5",
+   "knobs_changed": {
+    "modes": 0.5
+   },
+   "peak": 0.04408,
+   "rms": 0.00419
+  },
+  {
+   "file": "renders/modes_100.wav",
+   "args": "secs=3 modes=1",
+   "knobs_changed": {
+    "modes": 1
+   },
+   "peak": 0.06469,
+   "rms": 0.00445
+  },
+  {
+   "file": "renders/attack_300ms.wav",
+   "args": "secs=3 attack=0.687696",
+   "knobs_changed": {
+    "attack": 0.687696
+   },
+   "peak": 0.0336,
+   "rms": 0.00481
+  },
+  {
+   "file": "renders/attack_1s.wav",
+   "args": "secs=3 attack=0.832857",
+   "knobs_changed": {
+    "attack": 0.832857
+   },
+   "peak": 0.02344,
+   "rms": 0.00589
+  },
+  {
+   "file": "renders/decay_short.wav",
+   "args": "secs=3 decay=0.3",
+   "knobs_changed": {
+    "decay": 0.3
+   },
+   "peak": 0.04356,
+   "rms": 0.00221
+  },
+  {
+   "file": "renders/decay_long.wav",
+   "args": "secs=3 decay=0.9",
+   "knobs_changed": {
+    "decay": 0.9
+   },
+   "peak": 0.04388,
+   "rms": 0.0083
+  },
+  {
+   "file": "renders/sustain_050.wav",
+   "args": "secs=3 sustain=0.5",
+   "knobs_changed": {
+    "sustain": 0.5
+   },
+   "peak": 0.04384,
+   "rms": 0.00559
+  },
+  {
+   "file": "renders/extreme_a.wav",
+   "args": "secs=3 drop=1 ratio=1 stretch=0 modes=1 note=84",
+   "knobs_changed": {
+    "drop": 1,
+    "ratio": 1,
+    "stretch": 0,
+    "modes": 1,
+    "note": 84
+   },
+   "peak": 0.04261,
+   "rms": 0.00329
+  },
+  {
+   "file": "renders/extreme_b.wav",
+   "args": "secs=3 drop=0.6 ratio=0.05 stretch=1 modes=1 note=24",
+   "knobs_changed": {
+    "drop": 0.6,
+    "ratio": 0.05,
+    "stretch": 1,
+    "modes": 1,
+    "note": 24
+   },
+   "peak": 0.05947,
+   "rms": 0.00637
+  }
+ ]
+}
