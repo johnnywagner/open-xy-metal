@@ -20,9 +20,13 @@ const opxy::i32 DISPLAY_DROP_LEFT[24] = {
     878, 843, 804, 761, 716, 666, 614, 558,
     500, 438, 372, 304, 233, 158, 81, 0,
 };
-// log2 of each mode's material ratio, Q10
-const opxy::i32 DISPLAY_L_RM[8] = {
-    -911, 165, 515, 890, 1333, 1681, 1967, 2386,
+// log2 of the harmonic series, Q10
+const opxy::i32 DISPLAY_L_H[8] = {
+    0, 1024, 1623, 2048, 2378, 2647, 2875, 3072,
+};
+// log2 of each mode's material ratio over the first mode's, Q10
+const opxy::i32 DISPLAY_L_RA[8] = {
+    0, 1076, 1426, 1801, 2244, 2592, 2878, 3297,
 };
 // how long each mode's halo lasts on screen after a note, seconds Q10 (upper modes ring shorter)
 const opxy::i32 DISPLAY_RING[8] = {

@@ -2,7 +2,7 @@
   "schema": 1,
   "sdk": "1.1",
   "kind": "synth",
-  "description": "A two-operator FM strike that drops onto each note, ringing a modal resonator of up to four modes.",
+  "description": "A two-operator FM strike that drops onto each note, ringing an eight-mode modal resonator.",
   "identity": {
     "engine": 41,
     "page": 91

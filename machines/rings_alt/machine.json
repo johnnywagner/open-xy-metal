@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "sdk": "1.1",
+  "kind": "synth",
+  "description": "The rings FM strike ringing a tuned feedback delay: harmonic in the middle of STRETCH, stiff to the right, hollow to the left.",
+  "identity": {
+    "engine": 42,
+    "page": 92
+  },
+  "presetDefaults": {
+    "amp": {
+      "attack": 0,
+      "sustain": 0
+    }
+  }
+}

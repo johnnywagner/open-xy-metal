@@ -39,11 +39,11 @@
     {
       "id": "modes",
       "label": "Modes",
-      "default": 0.3333333333333333,
+      "default": 0.14269531250000003,
       "mapping": {
         "kind": "linear",
         "minimum": 1,
-        "maximum": 4
+        "maximum": 8
       },
       "display": "ratio"
     }
@@ -53,13 +53,19 @@
       "drop": 0,
       "ratio": 0.08855468749999998,
       "stretch": 1,
-      "modes": 0.3333333333333333
+      "modes": 0.14269531250000003
+    },
+    "Harmonic": {
+      "drop": 0,
+      "ratio": 0.08855468749999998,
+      "stretch": 0.5,
+      "modes": 0.14269531250000003
     },
     "Material": {
       "drop": 0,
       "ratio": 0.08855468749999998,
-      "stretch": 0.5,
-      "modes": 0.3333333333333333
+      "stretch": 0.75,
+      "modes": 0.14269531250000003
     },
     "All modes": {
       "drop": 0,
@@ -71,21 +77,21 @@
       "drop": 1,
       "ratio": 0.08855468749999998,
       "stretch": 1,
-      "modes": 0.3333333333333333
+      "modes": 0.14269531250000003
     }
   },
   "resources": {
-    "voiceBytes": 452,
+    "voiceBytes": 884,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
     "sharedBytes": 0,
-    "outputPeakQ31": 402653184,
+    "outputPeakQ31": 1073741823,
     "display": {
-      "stateBytes": 28,
+      "stateBytes": 44,
       "stateAlignment": 4,
       "paths": 1,
       "points": 64,
-      "nodes": 9,
+      "nodes": 17,
       "texts": 0,
       "palette": 16
     }

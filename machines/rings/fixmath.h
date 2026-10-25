@@ -20,11 +20,14 @@ inline i32 absolute(i32 v) { return v < 0 ? -v : v; }
 inline i32 mul30(i32 a, i32 c) { return mul(a, c) * 2; }
 inline i32 mul29(i32 a, i32 c) { return mul(a, c) * 4; }
 
-// sin of a 32-bit phase (2^32 per cycle), Q30, interpolated from 2048 points.
+// sin of a 32-bit phase (2^32 per cycle), Q30, interpolated from 2048 points, with the second-order term of the
+// interpolation's error put back (f (1 - f) (2 pi / 2048)^2 / 2 sin): good to a few parts in 10^9, so modes driven on
+// their own frequency sit where they should.
 inline i32 sine(u32 phase) {
     const u32 i = phase >> 21;
     const i32 f = static_cast<i32>((phase & 0x1fffffu) << 10);
-    return SINE[i] + mul(SINE[i + 1] - SINE[i], f);
+    const i32 y = SINE[i] + mul(SINE[i + 1] - SINE[i], f);
+    return y + mul(mul(mul(f, MAX - f), y), SINE_CURVE);
 }
 inline i32 cosine(u32 phase) { return sine(phase + 0x40000000u); }
 

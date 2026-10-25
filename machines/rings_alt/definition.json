@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "id": "rings_alt",
+  "name": "Rings Alt",
+  "parameters": [
+    {
+      "id": "drop",
+      "label": "Drop",
+      "default": 0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "ratio",
+      "label": "Ratio",
+      "default": 0.08855468749999998,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "stretch",
+      "label": "Stretch",
+      "default": 0.5,
+      "mapping": {
+        "kind": "linear",
+        "minimum": -1,
+        "maximum": 1
+      },
+      "display": "bipolar"
+    },
+    {
+      "id": "tone",
+      "label": "Tone",
+      "default": 0.6,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    }
+  ],
+  "presets": {
+    "Rings Alt": {
+      "drop": 0,
+      "ratio": 0.08855468749999998,
+      "stretch": 0.5,
+      "tone": 0.6
+    },
+    "Stiff": {
+      "drop": 0,
+      "ratio": 0.08855468749999998,
+      "stretch": 0.85,
+      "tone": 0.6
+    },
+    "Hollow": {
+      "drop": 0,
+      "ratio": 0.08855468749999998,
+      "stretch": 0.1,
+      "tone": 0.6
+    },
+    "Dark": {
+      "drop": 0,
+      "ratio": 0.08855468749999998,
+      "stretch": 0.5,
+      "tone": 0.25
+    },
+    "Fall": {
+      "drop": 1,
+      "ratio": 0.08855468749999998,
+      "stretch": 0.5,
+      "tone": 0.6
+    }
+  },
+  "resources": {
+    "voiceBytes": 8504,
+    "voiceAlignment": 4,
+    "voiceCapacity": 8,
+    "sharedBytes": 0,
+    "outputPeakQ31": 1073741823,
+    "display": {
+      "stateBytes": 44,
+      "stateAlignment": 4,
+      "paths": 1,
+      "points": 64,
+      "nodes": 17,
+      "texts": 0,
+      "palette": 16
+    }
+  }
+}
