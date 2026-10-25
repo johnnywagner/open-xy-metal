@@ -7,11 +7,13 @@ division or 64-bit arithmetic in the render path. Its algorithm is checked again
 stage. Since the port, its knob mappings have been made more tonal (Controls), so it no longer matches the reference
 note for note.
 
-Two variants sit beside it:
+Three variants sit beside it:
 
 - **rings2** ([machines/rings2](machines/rings2)) is rings with the reference's own mode tuning, before the tonal
   mappings: the modes at the material's ratios (the first below the note), RATIO free, and the reference's make-up.
   More atonal and metallic; otherwise the same engine and CPU (rings2, below).
+- **rings4** ([machines/rings4](machines/rings4)) is rings2 with STRETCH as a path through resonator shapes:
+  squeezed, drum, bell, material, stretched and bar, flat at each stop and gliding mode by mode between (rings4, below).
 - **rings3** ([machines/rings3](machines/rings3)) is the same voice with a tuned feedback delay for a resonator
   instead of eight modes: harmonic, cheaper, and a place to try other ideas (rings3, below). It was `ringsalt` and,
   before that, `rings_alt`.
@@ -20,9 +22,10 @@ Two variants sit beside it:
 | --- | --- |
 | [machines/rings](machines/rings) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
 | [machines/rings2](machines/rings2) | rings with the reference's mode tuning: the same files, its own `set_stretch`, make-up, page and `tests/sound.cpp` |
+| [machines/rings4](machines/rings4) | rings2 with STRETCH's stops: its own `spot_map`, page and `tests/sound.cpp` |
 | [machines/rings3](machines/rings3) | The delay-loop version: the same files, its own `engine.cpp`, `core.h` and page, and its test `tests/loop.cpp` |
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
-| [tools/gen_tables.py](tools/gen_tables.py) | Generates the three machines' `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
+| [tools/gen_tables.py](tools/gen_tables.py) | Generates the four machines' `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
 | [tools/probe.c](tools/probe.c) | The float reference with every stage exposed, for levels and debugging |
 
@@ -159,6 +162,27 @@ the modes stopping at 11 kHz, +12 dB). Its knobs read as rings':
 - **Presets:** **Rings 2** (STRETCH +100), **Material** (0), **Squeezed** (-50), **All modes** and **Fall**.
 - Its test is rings' `tests/sound.cpp` with the reference's tuning and make-up in the model: every stage at least
   55 dB against it.
+
+## rings4
+
+rings2 (its engine, free RATIO and the reference's make-up) with STRETCH as a path through six resonator shapes. Four
+are the reference's own material tables (rings.c, MODAL_TAB) and rings2's material at three stretches:
+
+| STRETCH | Stop | Mode ratios to the note |
+| --- | --- | --- |
+| -100 | Cluster: rings2's material squeezed (rings2 at -100) | 0.73 .. 2.24 |
+| -60 | Drum: a circular membrane | 1, 1.59, 2.14, 2.30, 2.65, 2.92, 3.16, 3.50 |
+| -25 | Bell: hum, prime, minor third, fifth, nominal ... | 0.5, 1, 1.2, 1.5, 2, 2.5, 3, 4 |
+| 0 | Material (rings2 at 0) | 0.54 .. 5.03 |
+| +65 | Stretched (rings2 at +100, its default) | 0.29 .. 25.3 |
+| +100 | Bar: a free bar (marimba, vibraphone) | 1, 2.76, 5.40, 8.93, 13.3, 18.6, 24.8, 31.9 |
+
+- Each stop holds for 4 either side; between stops every mode glides in log2 from one shape to the next on a
+  smoothstep, with the reference's small fixed detune throughout.
+- Drum and bar put their first mode on the note, where it catches the FM's fundamental: they are trimmed 7 dB, which
+  brings every stop within about 2 dB of the others.
+- **Presets:** **Rings 4** (stretched), **Cluster**, **Drum**, **Bell**, **Material**, **Bar**, **All modes** and **Fall**.
+- CPU as rings2; its test is rings2's with the stops in the model (`spot_map`).
 
 ## rings3
 
