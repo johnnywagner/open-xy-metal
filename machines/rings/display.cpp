@@ -1,4 +1,4 @@
-// rings' page: the eight modes as circles, spaced by their ratio to the note (STRETCH spreads or squeezes them),
+// rings' page: the four modes as circles, spaced by their ratio to the note (STRETCH spreads or squeezes them),
 // lit by how much MODES feeds each; at each note a halo rings out of every fed mode and fades with that mode's ring
 // time. Below, the DROP: the pitch falling from its start offset onto the note, over its time. Screen work only.
 #include "display.h"
@@ -49,12 +49,12 @@ void digits(char* out, u32 capacity, i32 value, int decimals, bool sign) {
     copy(out, capacity, text);
 }
 
-// The captions: DROP 0..100, RATIO 0.00..1.00, STRETCH -100..+100, MODES 1.0..8.0.
+// The captions: DROP 0..100, RATIO 0.00..1.00, STRETCH -100..+100, MODES 1.0..4.0.
 void captions(Frame& frame, const Input& input) {
     const i32 drop = (fraction(input.parameters[0]) * 100 + 512) >> 10;
     const i32 ratio = (fraction(input.parameters[1]) * 100 + 512) >> 10;
     const i32 stretch = ((fraction(input.parameters[2]) * 200 + 512) >> 10) - 100;
-    const i32 modes = 10 + ((fraction(input.parameters[3]) * 70 + 512) >> 10);
+    const i32 modes = 10 + ((fraction(input.parameters[3]) * 30 + 512) >> 10);
     digits(frame.header[0], sizeof frame.header[0], drop, 0, false);
     digits(frame.header[1], sizeof frame.header[1], ratio, 2, false);
     digits(frame.header[2], sizeof frame.header[2], stretch, 0, stretch != 0);
@@ -90,7 +90,7 @@ void drop_trace(Frame::path_type& path, i32 word) {
 
 inline void display_reset(DisplayState& state) {
     state.initialized = state.track = state.previous_event = 0;
-    for (u32 k = 0; k < 8; ++k) state.ages[k] = HALO_DONE;
+    for (u32 k = 0; k < 4; ++k) state.ages[k] = HALO_DONE;
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -98,11 +98,11 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const i32 elapsed = clamp(input.elapsed, 0, HALO_DONE);
     const bool snapshot = !state.initialized || state.track != input.track;
     if (snapshot || input.reduced_motion) {
-        for (u32 k = 0; k < 8; ++k) state.ages[k] = HALO_DONE;
+        for (u32 k = 0; k < 4; ++k) state.ages[k] = HALO_DONE;
     } else {
-        for (u32 k = 0; k < 8; ++k) state.ages[k] = clamp(state.ages[k] + elapsed, 0, HALO_DONE);
+        for (u32 k = 0; k < 4; ++k) state.ages[k] = clamp(state.ages[k] + elapsed, 0, HALO_DONE);
         if (input.track < 8 && input.note_serial != state.previous_event)
-            for (u32 k = 0; k < 8; ++k) state.ages[k] = 0;
+            for (u32 k = 0; k < 4; ++k) state.ages[k] = 0;
     }
     state.track = input.track;
     state.previous_event = input.note_serial;
@@ -114,22 +114,22 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
 
     // the modes: x by log2 of the ratio, STRETCH as 2^(2 x - 1) on the material's log2 ratio
     const i32 st = exp2_q10(((fraction(input.parameters[2]) * 2) - unit));
-    const i32 modes7 = fraction(input.parameters[3]) * 7;   // Q10: mode k is fed clamp(1 + 7x - k, 0, 1)
-    for (u32 k = 0; k < 8; ++k) {
-        const i32 fed = k == 0 ? unit : clamp(modes7 - static_cast<i32>(k - 1) * unit, 0, unit);
+    const i32 modes3 = fraction(input.parameters[3]) * 3;   // Q10: mode k is fed clamp(1 + 3x - k, 0, 1)
+    for (u32 k = 0; k < 4; ++k) {
+        const i32 fed = k == 0 ? unit : clamp(modes3 - static_cast<i32>(k - 1) * unit, 0, unit);
         const i32 lrr = (DISPLAY_L_RM[k] * st) >> 10;         // Q10 octaves
-        const i32 x = 46 * unit + (lrr + 2 * unit) * 54;      // 54 px per octave
-        const i32 size = unit + 640 - static_cast<i32>(k) * 72;
+        const i32 x = 240 * unit + lrr * 90;                 // 90 px per octave about the note
+        const i32 size = unit + 640 - static_cast<i32>(k) * 144;
         const i32 left = state.ages[k] >= HALO_DONE ? 0
             : clamp(unit - ((state.ages[k] * DISPLAY_RING_INV[k]) >> 16), 0, unit);   // Q10, 1 at the note
         const i32 lit = (fed * left) >> 10;
         place(frame, 1 + k, x, MODE_Y * unit, size, static_cast<u32>(clamp(2 + ((fed * 7) >> 10) + ((lit * 6) >> 10), 1, 15)),
               fed ? fill_and_stroke : stroke);
         if (lit > 0 && !input.reduced_motion)
-            place(frame, 9 + k, x, MODE_Y * unit, size + (((2 * unit - size) * (unit - left)) >> 10),
+            place(frame, 5 + k, x, MODE_Y * unit, size + (((2 * unit - size) * (unit - left)) >> 10),
                   static_cast<u32>(clamp((lit * 15) >> 10, 1, 15)), stroke);
         else
-            hide(frame, 9 + k);
+            hide(frame, 5 + k);
     }
 }
 } // namespace rings

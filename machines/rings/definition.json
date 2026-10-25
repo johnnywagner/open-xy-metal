@@ -39,11 +39,11 @@
     {
       "id": "modes",
       "label": "Modes",
-      "default": 0.14269531250000003,
+      "default": 0.3333333333333333,
       "mapping": {
         "kind": "linear",
         "minimum": 1,
-        "maximum": 8
+        "maximum": 4
       },
       "display": "ratio"
     }
@@ -53,13 +53,13 @@
       "drop": 0,
       "ratio": 0.08855468749999998,
       "stretch": 1,
-      "modes": 0.14269531250000003
+      "modes": 0.3333333333333333
     },
     "Material": {
       "drop": 0,
       "ratio": 0.08855468749999998,
       "stretch": 0.5,
-      "modes": 0.14269531250000003
+      "modes": 0.3333333333333333
     },
     "All modes": {
       "drop": 0,
@@ -71,21 +71,21 @@
       "drop": 1,
       "ratio": 0.08855468749999998,
       "stretch": 1,
-      "modes": 0.14269531250000003
+      "modes": 0.3333333333333333
     }
   },
   "resources": {
-    "voiceBytes": 636,
+    "voiceBytes": 452,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
     "sharedBytes": 0,
     "outputPeakQ31": 402653184,
     "display": {
-      "stateBytes": 44,
+      "stateBytes": 28,
       "stateAlignment": 4,
       "paths": 1,
       "points": 64,
-      "nodes": 17,
+      "nodes": 9,
       "texts": 0,
       "palette": 16
     }

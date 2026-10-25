@@ -1,6 +1,6 @@
 # rings for the OP-XY
 
-rings is a two-operator FM exciter that drops onto each note and strikes an eight-mode MODAL resonator. This
+rings is a two-operator FM exciter that drops onto each note and strikes a MODAL resonator. This
 repository ports it to the OP-XY as an [Open-XY](https://github.com/etcetc000/open-xy) synth machine. It is a
 fixed-point rewrite of the float reference engine in [port-kit/](port-kit/BRIEF.md): Q31 throughout, with no float,
 division or 64-bit arithmetic in the render path. Its sound is checked against the reference stage by stage.
@@ -22,10 +22,10 @@ The SDK lives beside this repository (`../open-xy`, branch `staging`).
 | 1 | DROP: the FM starts away from the note and drops onto it. One knob drives the start offset (+9 to -31.5 semitones) and the time (37 to 79 ms) | 0..100 |
 | 2 | RATIO: op2 : carrier, 0..1 | 0.00..1.00 |
 | 3 | STRETCH: mode spacing, squeezed (-100), as the material (0), spread (+100) | -100..+100 |
-| 4 | MODES: 1..8 modes, continuous; the next mode fades in | 1.0..8.0 |
+| 4 | MODES: 1..4 modes (the reference's first four), continuous; the next mode fades in | 1.0..4.0 |
 
 The mappings are the reference's, applied in `engine.cpp`. The defaults are the dialed-in sound, saved as the
-**Rings** preset. **Material**, **All modes** and **Fall** are the same sound with STRETCH at 0, MODES at 8 and DROP
+**Rings** preset. **Material**, **All modes** and **Fall** are the same sound with STRETCH at 0, MODES at 4 and DROP
 at 100.
 
 ### Envelope: option B
@@ -69,10 +69,10 @@ python tools/gen_tables.py             # after changing a constant
 
 **As sound** (`tools/check_renders.py`, `compare.py`, the port against the float reference as the machine runs it):
 
-- 26 of 27 settings PASS. Level is within 0.03 dB median and 0.26 dB p99, spectrum within 0.58 dB, onset within
-  0.61 dB.
-- `extreme_b` (C1) shows 1.6 dB in a weak 50 Hz band. That is the float reference's own rounding: the port matches
-  the double-precision reference there.
+- Every setting that uses at most 4 modes PASSES: 23 of the 27 renders. Level is within 0.04 dB median and 0.26 dB
+  p99, spectrum within 0.23 dB, onset within 0.16 dB.
+- The other four (`modes_050`, `modes_100`, `extreme_a`, `extreme_b`) use modes 5 to 8 in the reference. Those modes
+  no longer exist, so their bands are missing; the machine renders them with MODES at 4.
 
 **Fixed point only:**
 
@@ -95,6 +95,10 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU. Each 
   samples. Each takes its input once per two samples as the pair's sum, with its gain corrected by `1/cos(th/2)`. That
   is 1.5 multiplies per mode-sample instead of 3. Low modes keep `2 - 2 cos th` as a Q31 coefficient, so a mode at
   20 Hz holds its tuning to about 0.05 cents. Modes run in pairs, sharing the input and the accumulator.
+- **At most 4 modes.** MODES runs 1..4 over the reference's first four modes (the default, 2 modes, is unchanged).
+  Eight modes cost about 2,400 SDK-estimated instructions each, which kept the heaviest setting above the risk line.
+- **Low modes are fed once per four samples.** Modes below fs/8 take the drive's sum `[1/2 1 1 1 1/2]` once per four
+  samples, centred on the samples it sums, with its gain at the mode (`cos th cos^2(th/2)`) corrected.
 - **Both fixed low-passes** (20.7 kHz, Q 0.2) are one 3-tap linear-phase FIR (1 multiply), within 0.7 dB to 8 kHz
   and 1.3 dB to 16 kHz of the pair. It runs before the resonator: the chain after the FM core is linear. STRIKE, which
   the reference sends through the second low-pass after the modes, goes through the exact low-pass in its table.
@@ -111,18 +115,20 @@ The 2x-core version and the first 1x version are earlier commits.
 
 ## CPU
 
-`sdk.py test` and the same sweep run directly give, in the SDK's estimated Blackfin instructions per voice block:
+Counting instructions per voice block with the Q31 multiply as the one instruction it is on the Blackfin (valgrind,
+the most repeatable figure here):
 
-| Setting | Now | Before simplifying |
-| --- | --- | --- |
-| The defaults (2 modes) | about 18,000 | about 37,000 |
-| Heaviest: MODES at 8 | about 33,000 | about 53,000 to 63,000 |
+| Setting | rings now | rings with 8 modes, before simplifying | 2op FM |
+| --- | --- | --- | --- |
+| The defaults (2 modes) | 13,700 | 18,000 | 5,600 |
+| MODES at 4 | 15,200 | 25,000 (8 modes) | |
+| DROP, RATIO and MODES at full, STRETCH 0 | 16,500 | | |
 
-The aim is 15,000, and above 24,000 audio may drop with several voices; 2op FM reads 11,000 to 15,000 in the same
-runs. Each mode adds about 2,400, and the rest of the voice is about 13,000. Counting instructions with the Q31
-multiply as the one instruction it is on the Blackfin (valgrind), rings is 14,200 per block at its defaults and
-19,500 with 8 modes; 2op FM is 5,600 by that count. A pitch bend that re-runs the note set-up every block adds about
-7,000. No device measurement has been made.
+A rings voice now costs about 2.5 to 3 times a 2op FM voice. `sdk.py test` estimates **about 22,000 to 41,000
+Blackfin instructions per voice block** at the heaviest setting (around 31,000 typical; before: 50,000 to 76,000).
+The host timing is noisy, and 2op FM reads 11,400 to 12,900 in the same session. The aim is 15,000, and above 24,000
+audio may drop with several voices, so the heaviest setting is near that line rather than under the aim. A pitch bend
+that re-runs the note set-up every block adds several thousand. No device measurement has been made.
 
 ## Voices
 

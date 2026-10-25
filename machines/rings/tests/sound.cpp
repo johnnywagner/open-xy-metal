@@ -4,7 +4,8 @@
 // double precision, where the machine's own algorithm is built on the reference's state and set-up (dbl::block_lite:
 // the 1x FM core with op2 at half rate when slow, the merged low-pass FIR, the modes run undamped and fed in pairs). Every render in
 // port-kit/reference/manifest.json goes through the Q31 port and that model, as the machine runs it (ATTACK 0,
-// SUSTAIN 1: on the device the stock amp envelope shapes the sound), and they are compared sample by sample at four
+// SUSTAIN 1: on the device the stock amp envelope shapes the sound; MODES at most 4, as the machine's), and they are
+// compared sample by sample at four
 // stages: the FM core, the resonator's drive, the mix after the modes, and the output. That checks the fixed point.
 //
 // Whether the simplified algorithm is still the reference's sound is compare.py's question: tools/check_renders.py
@@ -101,7 +102,9 @@ static void core_block_1x(rings_t* v, float* x)
 }
 // The machine's MODAL (engine.cpp): the reference's modes, set up as it sets them up, run undamped with their decay
 // applied every 16 samples, fed the pair sum x[n] + x[n+1] every other sample (b / cos(th/2)), and struck with the
-// pulse through the fixed low-pass (the engine's STRIKE table, back in the reference's units).
+// pulse through the fixed low-pass (the engine's STRIKE table, back in the reference's units). Modes below fs/8 take
+// their input once per four samples.
+static float last_x;                                 // the drive's last sample of the previous 16
 static void modal_block_lite(rings_t* v, float* x)
 {
     if (v->stretch != v->rkey_stretch || v->note != v->rkey_note) modal_setup(v);
@@ -158,14 +161,25 @@ static void modal_block_lite(rings_t* v, float* x)
         const float b = (1.f - r) * M * v->ra[k] * RES_GAIN * edge * mkg[k] * wk[k] / cosf(0.5f * th);
         const float bi = strike ? sinf(th) * sqrtf(v->ra[k]) * RES_GAIN * edge * wk[k] * 2.f / (Wp * v->fs * wsum) : 0.f;
         float y1 = v->ry1[k], y2 = v->ry2[k];
-        for (int n = 0; n < RINGS_BLOCK; n += 2) {
-            const float a = c1 * y1 - y2 + b * (x[n] + x[n + 1]) + bi * pl[n];
-            const float z = c1 * a - y1 + bi * pl[n + 1];
-            y[n] += a; y[n + 1] += z; y2 = a; y1 = z;
+        if (th < 0.25 * 3.14159265358979323846) {     // below fs/8: input once per four samples, [1/2 1 1 1 1/2]
+            const float bq = b * cosf(0.5f * th) / (cosf(th) * cosf(0.5f * th) * cosf(0.5f * th));
+            for (int n = 0; n < RINGS_BLOCK; ++n) {
+                float a = c1 * y1 - y2 + bi * pl[n];
+                if ((n & 3) == 1)
+                    a += bq * (0.5f * (n == 1 ? last_x : x[n - 2]) + x[n - 1] + x[n] + x[n + 1] + 0.5f * x[n + 2]);
+                y[n] += a; y2 = y1; y1 = a;
+            }
+        } else {
+            for (int n = 0; n < RINGS_BLOCK; n += 2) {
+                const float a = c1 * y1 - y2 + b * (x[n] + x[n + 1]) + bi * pl[n];
+                const float z = c1 * a - y1 + bi * pl[n + 1];
+                y[n] += a; y[n + 1] += z; y2 = a; y1 = z;
+            }
         }
         const float d = powf(r, (float)RINGS_BLOCK);
         v->ry1[k] = y1 * d; v->ry2[k] = y2 * d;
     }
+    last_x = x[RINGS_BLOCK - 1];
     for (int n = 0; n < RINGS_BLOCK; ++n) x[n] = dry * x[n] + mix * y[n];
 }
 // The machine's whole block (engine.cpp) on the reference's state, in double precision, with its stages in the
@@ -259,6 +273,8 @@ const int N = BLOCKS * 64;
 enum { T_CORE, T_DRIVE, T_MIX, T_OUT, T_COUNT };
 
 opxy::i32 word(double knob) { return static_cast<opxy::i32>(std::floor(knob * 2147483647.0 + 0.5)); }
+// The reference's MODES knob (1 + 7x modes) as the machine's (1 + 3x, at most 4 modes).
+double machine_modes(double x) { return 7.0 * x / 3.0 < 1.0 ? 7.0 * x / 3.0 : 1.0; }
 
 // The double-precision model of the machine (dbl::block_lite) over a setting.
 void model_run(const Setting& s, double* tap[T_COUNT]) {
@@ -266,7 +282,8 @@ void model_run(const Setting& s, double* tap[T_COUNT]) {
     double fir[2] = {0, 0};
     dbl::dbl_rings_init(&v, 44100.f);
     dbl::s2pp_state = 0;
-    const double knobs[4] = {s.drop, s.ratio, s.stretch, s.modes};
+    dbl::last_x = 0;
+    const double knobs[4] = {s.drop, s.ratio, s.stretch, s.modes < 3.0 / 7.0 ? s.modes : 3.0 / 7.0};   // at most 4 modes
     for (int k = 0; k < 4; ++k) dbl::dbl_rings_set_knob(&v, (dbl::rings_knob)k, knobs[k]);
     dbl::dbl_rings_set_knob(&v, dbl::RINGS_ATTACK, 0.0);
     dbl::dbl_rings_set_knob(&v, dbl::RINGS_SUSTAIN, 1.0);   // no envelope of the voice's own
@@ -312,7 +329,7 @@ struct Result { double snr[T_COUNT], snr_float; opxy::i32 peak; };
 Result run(const Setting& s, double* port[T_COUNT], double* exact[T_COUNT], double* spec[T_COUNT], opxy::i32* pcm) {
     static rings::Voice voice;
     static rings::Shared shared;
-    opxy::i32 parameters[8] = {word(s.drop), word(s.ratio), word(s.stretch), word(s.modes), 0, 0, 0, 0};
+    opxy::i32 parameters[8] = {word(s.drop), word(s.ratio), word(s.stretch), word(machine_modes(s.modes)), 0, 0, 0, 0};
     opxy::u32 pitch[64];
     for (int i = 0; i < 64; ++i) pitch[i] = pitch_for(s.note);
     rings::initialize(voice, shared, 1);
