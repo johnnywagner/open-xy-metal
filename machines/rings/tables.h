@@ -16,16 +16,15 @@ const i32 EASE[9] = {
     86629172, 316128816, 642917127, 1021412300, 1406032527, 1751196004, 2011320924, 2140825482,
     2147483647,
 };
-const i32 MODE_SHIFT = 2;                       // the mode states carry 2^this x their share of the mix
-const i32 HP1_GAIN = 439042178;                 // core to the drive, times the dry share: folded into the first high-pass, Q31
-const i32 LP_B0 = 1442557949;                   // fixed 20.7 kHz low-pass, Q 0.2, direct form: b0 (b1 = 2 b0, b2 = b0), Q31
-const i32 LP_A1 = 1429292783;                   // a1, Q30
-const i32 LP_A2 = 764162584;                    // a2, Q31
+const i32 MODE_SHIFT = 1;                       // the mode states carry 2^this x their share of the mix
+const i32 LP_FIR = 273035849;                   // both fixed 20.7 kHz low-passes (Q 0.2) as one 3-tap linear-phase FIR, DC gain 1: x1 + h (x0 + x2 - 2 x1), Q31
+const i32 L_OUT = -21646227;                    // log2 of the mix to the output: dry share x both stage gains x 143; folded into the shelf
 const i32 HP_RATIO = 966367642;                 // keytracked high-pass at 0.45 x the note, Q31
 const i32 HP_INVQ = 1533916891;                 // keytracked high-pass 1/Q, Q30
 const i32 PK_INVQ = 1342177280;                 // presence peak 1/Q, Q30
 const i32 PK_A = 971336881;                     // presence peak A (+10.3 dB), Q29
 const i32 PK_AINV = 1186942993;                 // 1/A, Q31
+const i32 PK_A2M1 = 1220526101;                 // A^2 - 1, Q29: the peak is x + (A^2 - 1) x a band-pass of Q A
 const i32 HS_A = 836314968;                     // high shelf A (+7.7 dB), Q29
 const i32 HS_AP1 = 686592940;                   // A + 1, Q28
 const i32 HS_AM1 = 149722028;                   // A - 1, Q28
@@ -34,6 +33,7 @@ const i32 INC_PRESENCE_RATIO = 4;               // presence peak at 4x the note
 const i32 INC_SHELF_RATIO = 6;                  // high shelf at 6x the note
 const i32 INC_LIMIT = 1932735283;               // 0.45 fs as a phase increment
 const i32 INC_SIXTH = 613566756;                // modes below fs/7 keep 2 - 2 r cos th as a Q31 coefficient
+const i32 OP2_HALF_RATE = 25321803;             // op2 runs at half rate while slower than this (260 Hz) as a 1x increment
 const i32 INC_DROP_LIMIT = 1717986918;          // the drop keeps the carrier below 0.4 fs (0.2 of the reference 2x rate)
 const i32 INC_20HZ = 1947831;                   // 20 Hz as a phase increment
 const i32 L_INC_20HZ = 350533707;               // its log2
@@ -63,21 +63,13 @@ const i32 L_SPREAD[8] = {
 const i32 L_BW[8] = {
     11539854, 11968013, 12913814, 13991400, 15348970, 16477936, 17449565, 18940816,
 };
-// each mode's 2 (1 - r), r its pole radius (ring 3.6 s x rt), Q31
-const i32 TWO_1MR[8] = {
-    186897, 195692, 215682, 239430, 270892, 298434, 323189, 363168,
-};
-// r, Q31
-const i32 POLE[8] = {
-    2147390200, 2147385802, 2147375807, 2147363933, 2147348202, 2147334431, 2147322054, 2147302064,
-};
-// 1 - r^2, Q31
-const i32 ETA[8] = {
-    186893, 195688, 215677, 239423, 270884, 298424, 323177, 363153,
+// each mode's decay over 16 samples, r^16 (ring 3.6 s x rt), Q31
+const i32 DAMP16[8] = {
+    2145988962, 2145918644, 2145758841, 2145569011, 2145317535, 2145097416, 2144899596, 2144580146,
 };
 // log2 of (1 - r) 2 sqrt(r) ra RES_GAIN x wet / dry x 2^MODE_SHIFT: the input gain before sin th, sqrt(1 + eps), make-up, edge and MODES
 const i32 L_B[8] = {
-    -154075889, -153490678, -152252986, -150923781, -149352717, -148120561, -147106558, -145622482,
+    -170853105, -170267894, -169030202, -167700997, -166129933, -164897777, -163883774, -162399698,
 };
 // log2 of (1 - r)^2 / (4 r): with sin(th)^2, the correction sqrt(1 + eps)
 const i32 L_EPS[8] = {
@@ -85,20 +77,20 @@ const i32 L_EPS[8] = {
 };
 // log2 of RES_GAIN 2 / (Wp fs) x wet x 2^MODE_SHIFT: STRIKE into each mode, before sin th and its share sqrt(ra) edge MODES / wsum
 const i32 L_BP[8] = {
-    6986942, 6986942, 6986942, 6986942, 6986942, 6986942, 6986942, 6986942,
+    13192405, 13192405, 13192405, 13192405, 13192405, 13192405, 13192405, 13192405,
 };
 // sqrt(ra), Q31: shares the strike between modes
 const i32 SQRT_RA[8] = {
     2147483647, 2124193908, 2075765700, 2024985133, 1966563476, 1921925674, 1885951581, 1834510301,
 };
-// the STRIKE pulse (raised cosine, 0.26 ms) through the fixed low-pass, at the drive level before the dry share, Q31; negative, as the drive carries the reference stage gain with its sign dropped
+// the STRIKE pulse (raised cosine, 0.26 ms) through the fixed low-pass, in drive units, Q31; negative, as the drive drops the reference stage gain and its sign
 const i32 STRIKE[48] = {
-    0, -3388685, -14827469, -32393832, -50405524, -63776183, -68511902, -63250429,
-    -49525175, -31364988, -14094882, -2780188, 276881, -101831, 37025, -13049,
-    4195, -941, -240, 655, -786, 813, -803, 779,
-    -752, 723, -695, 668, -642, 617, -593, 569,
-    -547, 526, -505, 485, -466, 448, -430, 413,
-    -397, 382, -367, 352, -338, 325, -312, 300,
+    0, -3206650, -14030959, -30653683, -47697814, -60350220, -64831544, -59852709,
+    -46864756, -29680107, -13337726, -2630840, 262007, -96360, 35036, -12348,
+    3970, -891, -227, 619, -744, 769, -760, 737,
+    -711, 684, -658, 632, -607, 584, -561, 539,
+    -518, 497, -478, 459, -441, 424, -407, 391,
+    -376, 361, -347, 333, -320, 308, -296, 284,
 };
 const i32 DROP_SPLIT_INV = 1007137020;          // 1 / DROP_SPLIT, Q29
 const i32 DROP_SPLIT_Q31 = 1144751391;          // DROP_SPLIT, Q31

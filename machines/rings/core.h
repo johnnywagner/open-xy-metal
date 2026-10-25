@@ -25,20 +25,23 @@ struct Voice {
     i32 sweep_u;             // Q31: how far through the drop (MAX: done)
     // FM core
     u32 ph0, ph2, inc_prev;
-    i32 s2p, l1, l2;
+    i32 s2p, s2pp, l1, l2;
     i32 bite;                // Q31: BITE still to come, 1 at note-on
     // the onset: the reference's 3 ms eased attack; the stock amp envelope does the rest
     i32 gain;                // Q31 gain after the last 16 samples (sqrt of the level)
     i32 att_u, att_g0;
     u32 att_j, ramping;
-    // filters, direct form I
-    Biquad lp1, lp2, hp1, pk, hp2, hs;
-    i32 hp_c[4];             // high-passes: b0 of the first (with the drive and dry gains), b0, 2 + a1, 1 - a2
-    i32 pk_c[4];             // presence: b0 - 1, 2 + a1, 1 - b2, 1 - a2
-    i32 hs_c[5];             // shelf: b0, b1, b2, a1, a2
-    // MODAL: direct-form two-pole resonators, as the reference
+    // filters, direct form I, and the low-pass FIR's last four inputs
+    Biquad hp1, pk, hp2, hs;
+    i32 fir[2];
+    i32 hp_c[2];             // high-passes: 2 + a1, 1 - a2
+    i32 hp_lb0;              // log2 of the high-passes' b0 (they run unnormalised; the shelf carries it)
+    i32 pk_c[3];             // presence band-pass: (A^2 - 1) b0, 2 + a1, 1 - a2
+    i32 hs_c[5];             // shelf: b0, b1, b2, a1, a2 (b with every output gain)
+    // MODAL: undamped two-pole oscillators, damped every 16 samples
     i32 y1[MODES], y2[MODES];
-    i32 mc[MODES];           // below fs/7: 2 - 2 r cos th, Q31; above: 2 r cos th, Q30
+    i32 mc[MODES];           // below fs/7: 2 - 2 cos th, Q31; above: 2 cos th, Q30
+    i32 lch[MODES];          // log2 cos(th / 2), Q24
     i32 b[MODES];            // drive into each mode, Q31
     i32 sn[MODES];           // sin th, Q31
     i32 edge[MODES];         // fade near 20 Hz and 0.45 fs, Q31
