@@ -7,13 +7,14 @@ division or 64-bit arithmetic in the render path. Its algorithm is checked again
 stage. Since the port, its knob mappings have been made more tonal (Controls), so it no longer matches the reference
 note for note.
 
-**rings_alt** ([machines/rings_alt](machines/rings_alt)) is the same voice with a tuned feedback delay for a resonator
-instead of eight modes: harmonic, cheaper, and a place to try other ideas (rings_alt, below).
+**ringsalt** ([machines/ringsalt](machines/ringsalt)) is the same voice with a tuned feedback delay for a resonator
+instead of eight modes: harmonic, cheaper, and a place to try other ideas (ringsalt, below). Its ID has no underscore: as `rings_alt`, its artwork failed to load and the OP-XY halted at boot
+(`svg_loader.cpp:28 document_`). No stock engine name has one.
 
 | Folder | What |
 | --- | --- |
 | [machines/rings](machines/rings) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
-| [machines/rings_alt](machines/rings_alt) | The delay-loop version: the same files, its own `engine.cpp`, `core.h` and page, and its test `tests/loop.cpp` |
+| [machines/ringsalt](machines/ringsalt) | The delay-loop version: the same files, its own `engine.cpp`, `core.h` and page, and its test `tests/loop.cpp` |
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
 | [tools/gen_tables.py](tools/gen_tables.py) | Generates both machines' `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
@@ -138,7 +139,7 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
 The 2x-core version, the first 1x version, the 4-mode version and the 8-mode version before the tonal mappings are
 earlier commits.
 
-## rings_alt
+## ringsalt
 
 The same FM core, onset, chain and level, with one tuned feedback delay instead of the eight modes. It rings every
 harmonic of the note at once, so its cost does not grow with them. It runs at half rate (partials up to 11 kHz, as the
@@ -166,7 +167,7 @@ modes) and is interpolated back as the half-rate modes are.
 Counting instructions per voice block with the Q31 multiply as the one instruction it is on the Blackfin (valgrind,
 the most repeatable figure here), at 440 Hz as the SDK times it:
 
-| Setting | rings | rings_alt | rings, 4 modes (before) | 2op FM |
+| Setting | rings | ringsalt | rings, 4 modes (before) | 2op FM |
 | --- | --- | --- | --- | --- |
 | The defaults | 10,900 | 9,700 | 13,700 | 5,600 |
 | The heaviest knob of the SDK's sweep | 13,900 (MODES 8) | 10,600 (RATIO up) | 16,500 | |
@@ -176,7 +177,7 @@ Stopping the modes at 11 kHz saves most at high notes (about 15 to 20% at C6 and
 31,700 once in rings (the set-up of eight modes and the strike).
 
 `sdk.py test` estimates **about 24,000 to 28,500 Blackfin instructions per voice block for rings** and **16,000 to 20,000
-for rings_alt** at their heaviest settings; 2op FM reads about 14,000. The estimate times the host, where the SDK's
+for ringsalt** at their heaviest settings; 2op FM reads about 14,000. The estimate times the host, where the SDK's
 portable Q31 multiply takes a dozen instructions and an unpredictable branch, so it overstates multiply-heavy engines
 such as these, and it varies by a fifth between runs here. The aim is 15,000, and above 24,000 audio may drop with
 several voices. No device measurement has been made.

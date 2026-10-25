@@ -1,11 +1,11 @@
-// rings_alt's page: the loop's first eight partials as circles, spaced by their ratio to the note (STRETCH right
+// ringsalt's page: the loop's first eight partials as circles, spaced by their ratio to the note (STRETCH right
 // stretches them, as at 256 Hz; left dims the even ones), lit by TONE (dark: the upper ones dim); at each note a halo
 // rings out of each and fades. Below, the DROP: the pitch falling from its start offset onto the note, over its time.
 // Screen work only.
 #include "display.h"
 #include "display_tables.h"
 
-namespace rings_alt {
+namespace ringsalt {
 namespace {
 using opxy::i32;
 using opxy::u32;
@@ -140,4 +140,4 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
             hide(frame, 9 + k);
     }
 }
-} // namespace rings_alt
+} // namespace ringsalt

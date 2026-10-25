@@ -2,7 +2,7 @@
 #include <opxy/audio.hpp>
 #include "tables.h"
 
-namespace rings_alt {
+namespace ringsalt {
 using opxy::i32;
 using opxy::u32;
 
@@ -53,6 +53,6 @@ struct Voice {
     i32 sg;                  // STRIKE into the loop, Q31
     i32 line[ALT_LINE];
 };
-// rings_alt voices share nothing.
+// ringsalt voices share nothing.
 struct Shared {};
 }
