@@ -3,8 +3,8 @@
 // tools/gen_tables.py).
 //
 // Per 64-sample block:
-//   FM core at 2x, in four 16-sample steps (the drop, BITE and the onset move per step, as in the reference)
-//     -> half-band to 1x -> the two fixed 20.7 kHz low-passes -> keytracked high-pass (with the drive gain)
+//   FM core, in four 16-sample steps (the drop, BITE and the onset move per step, as in the reference)
+//     -> the two fixed 20.7 kHz low-passes -> keytracked high-pass (with the drive gain)
 //     -> presence peak
 //   -> MODAL: eight two-pole resonators (+ STRIKE at note-on), mixed with the dry drive
 //   -> keytracked high-pass -> keytracked high shelf -> output, Q31 (gain 143: the loudest setting peaks near 1/8)
@@ -241,10 +241,12 @@ i32 onset_step(Voice& v) {
 }
 
 // ---------------------------------------------------------------- FM core
-// One 16-sample step at 2x: op2 with self-feedback phase-modulates the carrier through two one-poles; the drop
-// multiplies both increments. Writes s0 + s1 of the half-band (2x the reference's x).
+// One 16-sample step: op2 with self-feedback phase-modulates the carrier through two one-poles; the drop multiplies
+// both increments. The reference runs this at 2x and decimates with a half-band; here it runs at 1x with the 2x
+// rate's quantities (op2's sample difference halved, the carrier's phase offset doubled, the one-poles at their
+// 1x coefficient), which compare.py cannot tell from the 2x core (README). Writes 2x the reference's x.
 void core_step(Voice& v, i32* x, u32 base, i32 ratio) {
-    u32 inc0 = base >> 1;                              // 2x rate
+    u32 inc0 = base;
     if (v.sweep_oct) {
         if (!v.sweep_u) {
             inc0 = exp2u(log2u(inc0) + v.sweep_oct);   // nothing of the drop done yet
@@ -253,42 +255,34 @@ void core_step(Voice& v, i32* x, u32 base, i32 ratio) {
             const i32 left = MAX - exp2q(lu + mul(lu, SWEEP_E), 31);   // 1 - u^e
             inc0 = exp2u(log2u(inc0) + mul(v.sweep_oct, left));
         }
-        if (inc0 > static_cast<u32>(INC_2X_LIMIT)) inc0 = static_cast<u32>(INC_2X_LIMIT);
+        if (inc0 > static_cast<u32>(INC_DROP_LIMIT)) inc0 = static_cast<u32>(INC_DROP_LIMIT);
         if (v.sweep_u < MAX) {                         // u = j du; the drop never takes more than 256 steps
             const u32 u = static_cast<u32>(v.sweep_du >> 4) * ++v.sweep_j;   // Q27
             v.sweep_u = u >= (1u << 27) || v.sweep_j >= 256 ? MAX : static_cast<i32>(u << 4);
         }
     }
-    const u32 inc2 = static_cast<u32>(mul(static_cast<i32>(inc0), ratio));
+    const u32 inc2 = static_cast<u32>(mul(static_cast<i32>(inc0 >> 1), ratio)) * 2u;
     const i32 depth = DEPTH0 + mul(DEPTH_BITE, v.bite);   // Q29
     v.bite = mul(v.bite, BITE_DECAY);
     const i32 diff = static_cast<i32>(inc0 - v.inc_prev);
-    const u32 dinc = static_cast<u32>(diff >= 0 ? diff >> 5 : -((-diff) >> 5));
+    const u32 dinc = static_cast<u32>(diff >= 0 ? diff >> 4 : -((-diff) >> 4));
     u32 inc = v.inc_prev, ph0 = v.ph0, ph2 = v.ph2;
     i32 s2p = v.s2p, l1 = v.l1, l2 = v.l2;
-    i32 car[2 * STEP];
-    for (unsigned k = 0; k < 2 * STEP; ++k) {
+    for (unsigned k = 0; k < STEP; ++k) {
         ph2 += inc2;
         const i32 s2 = sine(ph2 + static_cast<u32>(mul(s2p, FB_PHASE)));
-        const i32 d = clamp(s2 - s2p, -(1 << 30), (1 << 30) - 1);
+        const i32 d = clamp(half(s2 - s2p), -(1 << 30), (1 << 30) - 1);
         s2p = s2;
         const i32 m = l1;
-        l1 = half(l1) + half(d);
+        l1 = half(half(l1)) + d - half(half(d));       // 0.25 l1 + 0.75 d
         const i32 u = l2;
-        l2 = half(l2) + half(clamp(mul29(m, depth), -(1 << 30), (1 << 30) - 1));
+        const i32 dm = clamp(mul29(m, depth), -(1 << 30), (1 << 30) - 1);
+        l2 = half(half(l2)) + dm - half(half(dm));
         inc += dinc;
-        car[k] = sar(sine(ph0), 3);                    // the carrier at 1/16 full scale
-        ph0 += inc + static_cast<u32>(u);              // 0.25 u cycles: u in Q30
+        x[k] = half(half(sine(ph0)));                  // the carrier, 1/8 full scale
+        ph0 += inc + 2u * static_cast<u32>(u);         // 0.25 u cycles per 2x sample: u in Q30
     }
     v.ph0 = ph0; v.ph2 = ph2; v.s2p = s2p; v.l1 = l1; v.l2 = l2; v.inc_prev = inc0;
-    for (unsigned n = 0; n < STEP; ++n) {              // 2x -> 1x
-        i32 s1 = car[2 * n], s0 = car[2 * n + 1], t;
-        t = mul(s0 - v.hy[0], HALFBAND[0]) + v.hx[0]; v.hx[0] = s0; v.hy[0] = t; s0 = t;
-        t = mul(s0 - v.hy[2], HALFBAND[2]) + v.hx[2]; v.hx[2] = s0; v.hy[2] = t; s0 = t;
-        t = mul(s1 - v.hy[1], HALFBAND[1]) + v.hx[1]; v.hx[1] = s1; v.hy[1] = t; s1 = t;
-        t = mul(s1 - v.hy[3], HALFBAND[3]) + v.hx[3]; v.hx[3] = s1; v.hy[3] = t; s1 = t;
-        x[n] = s0 + s1;
-    }
 }
 
 // ---------------------------------------------------------------- MODAL
@@ -377,7 +371,7 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
     const bool strike = v.note_pending != 0;
     if (strike) {
         v.note_pending = 0;
-        const u32 base = pitch[0] >> 1;
+        const u32 base = pitch[0];
         if (v.sweep_oct) v.inc_prev = exp2u(log2u(base) + v.sweep_oct);   // start where the drop starts
         else if (!v.inc_prev) v.inc_prev = base;
     }
@@ -410,7 +404,7 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
     i32 acc[opxy::block_frames];
     for (unsigned n = 0; n < opxy::block_frames; ++n) acc[n] = 0;
     modes_block(v, x, acc, strike);
-    for (unsigned n = 0; n < opxy::block_frames; ++n) acc[n] = x[n] + sar(acc[n], MODE_SHIFT);
+    for (unsigned n = 0; n < opxy::block_frames; ++n) acc[n] = x[n] + half(half(acc[n]));   // 2^-MODE_SHIFT
     if (taps) for (unsigned n = 0; n < opxy::block_frames; ++n) taps->mix[n] = acc[n];
     if (shaped) for (unsigned n = 0; n < opxy::block_frames; ++n) acc[n] = mul(acc[n], gains[n]);
     // ---- after the resonator

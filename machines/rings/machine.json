@@ -2,9 +2,15 @@
   "schema": 1,
   "sdk": "1.1",
   "kind": "synth",
-  "description": "Rings",
+  "description": "A two-operator FM strike that drops onto each note, ringing an eight-mode modal resonator.",
   "identity": {
-    "engine": 36,
-    "page": 84
+    "engine": 41,
+    "page": 91
+  },
+  "presetDefaults": {
+    "amp": {
+      "attack": 0,
+      "sustain": 0
+    }
   }
 }

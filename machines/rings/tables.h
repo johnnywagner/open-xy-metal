@@ -10,10 +10,6 @@ const i32 FB_PHASE = 271665728;                 // op2 feedback: op2's last outp
 const i32 DEPTH0 = 261957989;                   // FM depth, Q29
 const i32 BITE_AMOUNT = 966367680;              // BITE: extra depth at note-on, Q29
 const i32 BITE_DECAY = 2116543405;              // BITE falls by this per 16 samples, Q31
-// 2x to 1x polyphase half-band allpass coefficients, Q31
-const i32 HALFBAND[4] = {
-    217899840, 734644672, 1315168000, 1863258752,
-};
 const i32 ATTACK_STEP = 259710796;              // the onset's linear level ramp per 16 samples (3 ms), Q31
 // the onset's ease-in (smoothstep) after each 16 samples, Q31
 const i32 EASE[9] = {
@@ -21,7 +17,7 @@ const i32 EASE[9] = {
     2147483647,
 };
 const i32 MODE_SHIFT = 2;                       // the mode states carry 2^this x their share of the mix
-const i32 HP1_GAIN = 439042178;                 // core (s0 + s1) to the drive, times the dry share: folded into the first high-pass, Q31
+const i32 HP1_GAIN = 439042178;                 // core to the drive, times the dry share: folded into the first high-pass, Q31
 const i32 LP_B0 = 1442557949;                   // fixed 20.7 kHz low-pass, Q 0.2, direct form: b0 (b1 = 2 b0, b2 = b0), Q31
 const i32 LP_A1 = 1429292783;                   // a1, Q30
 const i32 LP_A2 = 764162584;                    // a2, Q31
@@ -38,7 +34,7 @@ const i32 INC_PRESENCE_RATIO = 4;               // presence peak at 4x the note
 const i32 INC_SHELF_RATIO = 6;                  // high shelf at 6x the note
 const i32 INC_LIMIT = 1932735283;               // 0.45 fs as a phase increment
 const i32 INC_SIXTH = 613566756;                // modes below fs/7 keep 2 - 2 r cos th as a Q31 coefficient
-const i32 INC_2X_LIMIT = 858993459;             // the drop keeps the 2x carrier below 0.2 of its rate
+const i32 INC_DROP_LIMIT = 1717986918;          // the drop keeps the carrier below 0.4 fs (0.2 of the reference 2x rate)
 const i32 INC_20HZ = 1947831;                   // 20 Hz as a phase increment
 const i32 L_INC_20HZ = 350533707;               // its log2
 const i32 L_INC_NY = 517543507;                 // log2 of 0.45 fs as an increment

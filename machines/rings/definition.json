@@ -48,19 +48,44 @@
       "display": "ratio"
     }
   ],
-  "presets": {},
+  "presets": {
+    "Rings": {
+      "drop": 0,
+      "ratio": 0.08855468749999998,
+      "stretch": 1,
+      "modes": 0.14269531250000003
+    },
+    "Material": {
+      "drop": 0,
+      "ratio": 0.08855468749999998,
+      "stretch": 0.5,
+      "modes": 0.14269531250000003
+    },
+    "All modes": {
+      "drop": 0,
+      "ratio": 0.08855468749999998,
+      "stretch": 1,
+      "modes": 1
+    },
+    "Fall": {
+      "drop": 1,
+      "ratio": 0.08855468749999998,
+      "stretch": 1,
+      "modes": 0.14269531250000003
+    }
+  },
   "resources": {
-    "voiceBytes": 604,
+    "voiceBytes": 632,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
     "sharedBytes": 0,
     "outputPeakQ31": 402653184,
     "display": {
-      "stateBytes": 4,
+      "stateBytes": 44,
       "stateAlignment": 4,
-      "paths": 2,
+      "paths": 1,
       "points": 64,
-      "nodes": 2,
+      "nodes": 17,
       "texts": 0,
       "palette": 16
     }
