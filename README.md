@@ -7,16 +7,22 @@ division or 64-bit arithmetic in the render path. Its algorithm is checked again
 stage. Since the port, its knob mappings have been made more tonal (Controls), so it no longer matches the reference
 note for note.
 
-**ringsalt** ([machines/ringsalt](machines/ringsalt)) is the same voice with a tuned feedback delay for a resonator
-instead of eight modes: harmonic, cheaper, and a place to try other ideas (ringsalt, below). Its ID has no underscore: as `rings_alt`, its artwork failed to load and the OP-XY halted at boot
-(`svg_loader.cpp:28 document_`). No stock engine name has one.
+Two variants sit beside it:
+
+- **rings2** ([machines/rings2](machines/rings2)) is rings with the reference's own mode tuning, before the tonal
+  mappings: the modes at the material's ratios (the first below the note), RATIO free, and the reference's make-up.
+  More atonal and metallic; otherwise the same engine and CPU (rings2, below).
+- **rings3** ([machines/rings3](machines/rings3)) is the same voice with a tuned feedback delay for a resonator
+  instead of eight modes: harmonic, cheaper, and a place to try other ideas (rings3, below). It was `ringsalt` and,
+  before that, `rings_alt`.
 
 | Folder | What |
 | --- | --- |
 | [machines/rings](machines/rings) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
-| [machines/ringsalt](machines/ringsalt) | The delay-loop version: the same files, its own `engine.cpp`, `core.h` and page, and its test `tests/loop.cpp` |
+| [machines/rings2](machines/rings2) | rings with the reference's mode tuning: the same files, its own `set_stretch`, make-up, page and `tests/sound.cpp` |
+| [machines/rings3](machines/rings3) | The delay-loop version: the same files, its own `engine.cpp`, `core.h` and page, and its test `tests/loop.cpp` |
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
-| [tools/gen_tables.py](tools/gen_tables.py) | Generates both machines' `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
+| [tools/gen_tables.py](tools/gen_tables.py) | Generates the three machines' `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
 | [tools/probe.c](tools/probe.c) | The float reference with every stage exposed, for levels and debugging |
 
@@ -139,7 +145,22 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
 The 2x-core version, the first 1x version, the 4-mode version and the 8-mode version before the tonal mappings are
 earlier commits.
 
-## ringsalt
+## rings2
+
+rings as it was before the tonal mappings, on the current engine (eight modes, half-rate low modes, the fitted chain,
+the modes stopping at 11 kHz, +12 dB). Its knobs read as rings':
+
+- **STRETCH** scales the material's ratios in log2 by 2^(2 x - 1): ratio^1/2 at -100, the material at 0, ratio^2 at
+  +100, with the reference's small fixed detune per mode. The first mode sits at 0.54 times the note (an octave below
+  at +100), so there is no harmonic middle.
+- **RATIO** is free: no magnets.
+- **Make-up** is the reference's: modes off the FM's harmonic lattice get up to 18 dB more (they catch less of it),
+  modes moved up up to 12 dB more. No drive trim: held notes sit 3 to 4 dB below rings', the strike about level.
+- **Presets:** **Rings 2** (STRETCH +100), **Material** (0), **Squeezed** (-50), **All modes** and **Fall**.
+- Its test is rings' `tests/sound.cpp` with the reference's tuning and make-up in the model: every stage at least
+  55 dB against it.
+
+## rings3
 
 The same FM core, onset, chain and level, with one tuned feedback delay instead of the eight modes. It rings every
 harmonic of the note at once, so its cost does not grow with them. It runs at half rate (partials up to 11 kHz, as the
@@ -159,7 +180,7 @@ modes) and is interpolated back as the half-rate modes are.
   account (table atan): within 1 cent from C1 to C7 at every setting (`tests/loop.cpp`).
 - **Ring time:** the note rings as rings' first mode does; the drive is scaled so the note's resonance peaks at the
   same level at every pitch. Notes below 11 Hz go up an octave.
-- **Presets:** **Rings Alt** (harmonic, TONE 60), **Stiff**, **Hollow**, **Dark** and **Fall**.
+- **Presets:** **Rings 3** (harmonic, TONE 60), **Stiff**, **Hollow**, **Dark** and **Fall**.
 - Pitch bends retune the loop in steps (each 3.4 cents or more); a big bend can click.
 
 ## CPU
@@ -167,17 +188,17 @@ modes) and is interpolated back as the half-rate modes are.
 Counting instructions per voice block with the Q31 multiply as the one instruction it is on the Blackfin (valgrind,
 the most repeatable figure here), at 440 Hz as the SDK times it:
 
-| Setting | rings | ringsalt | rings, 4 modes (before) | 2op FM |
-| --- | --- | --- | --- | --- |
-| The defaults | 10,900 | 9,700 | 13,700 | 5,600 |
-| The heaviest knob of the SDK's sweep | 13,900 (MODES 8) | 10,600 (RATIO up) | 16,500 | |
-| The heaviest across pitches | 16,200 (harmonic, 8 modes, about 1 kHz) | 10,600 (any pitch) | | |
+| Setting | rings | rings2 | rings3 | rings, 4 modes (before) | 2op FM |
+| --- | --- | --- | --- | --- | --- |
+| The defaults | 10,900 | 10,900 | 9,700 | 13,700 | 5,600 |
+| The heaviest knob of the SDK's sweep | 13,900 (MODES 8) | 14,200 (MODES 8) | 10,600 (RATIO up) | 16,500 | |
+| The heaviest across pitches | 16,200 (harmonic, 8 modes, about 1 kHz) | | 10,600 (any pitch) | | |
 
 Stopping the modes at 11 kHz saves most at high notes (about 15 to 20% at C6 and C7). A note-on block costs about
 31,700 once in rings (the set-up of eight modes and the strike).
 
-`sdk.py test` estimates **about 24,000 to 28,500 Blackfin instructions per voice block for rings** and **16,000 to 20,000
-for ringsalt** at their heaviest settings; 2op FM reads about 14,000. The estimate times the host, where the SDK's
+`sdk.py test` estimates **about 22,000 to 28,500 Blackfin instructions per voice block for rings and rings2** and
+**16,000 to 20,000 for rings3** at their heaviest settings; 2op FM reads about 14,000. The estimate times the host, where the SDK's
 portable Q31 multiply takes a dozen instructions and an unpredictable branch, so it overstates multiply-heavy engines
 such as these, and it varies by a fifth between runs here. The aim is 15,000, and above 24,000 audio may drop with
 several voices. No device measurement has been made.
