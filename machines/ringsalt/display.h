@@ -1,7 +1,7 @@
 #pragma once
 #include <opxy/draw.hpp>
 
-namespace rings_alt {
+namespace ringsalt {
 // One DROP trace (64 points), eight partial circles and eight halos; no text; 16 greys.
 using Frame = opxy::draw::Frame<1, 64, 17, 0, 16>;
 struct DisplayState {
