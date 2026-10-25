@@ -59,17 +59,18 @@ python tools/gen_tables.py             # after changing a constant
 
 **Stage by stage, sample by sample** (`tests/sound.cpp`, run by `sdk.py test`):
 
-- The test compiles the reference into itself twice: as it is, and in double precision with the machine's 1x FM core.
+- The test compiles the reference into itself twice: as it is, and in double precision with the machine's own
+  algorithm (the 1x core, the FIR, the undamped modes fed in pairs) built on the reference's state and set-up.
 - It renders all 27 reference settings through the port and through the double-precision model, and compares the
   FM core, the resonator's drive, the mix after the modes and the output.
-- Every stage of every setting matches at 59 to 64 dB SNR, including C1, where low modes sit near 20 Hz.
+- Every stage of every setting matches that model at 58 to 72 dB SNR, including C1, where low modes sit near 20 Hz.
 - The float reference itself sits further from its own formulas. Its float32 `2 r cos th` puts low modes a few cents
   off, and its float32 resonators have a noise floor 20 to 30 dB above the port's.
 
 **As sound** (`tools/check_renders.py`, `compare.py`, the port against the float reference as the machine runs it):
 
-- 26 of 27 settings PASS. Level is within 0.04 dB median and 0.31 dB p99, spectrum within 0.22 dB, onset within
-  0.15 dB.
+- 26 of 27 settings PASS. Level is within 0.03 dB median and 0.26 dB p99, spectrum within 0.58 dB, onset within
+  0.61 dB.
 - `extreme_b` (C1) shows 1.6 dB in a weak 50 Hz band. That is the float reference's own rounding: the port matches
   the double-precision reference there.
 
@@ -82,31 +83,46 @@ python tools/gen_tables.py             # after changing a constant
 
 ## Design notes
 
+The engine is the reference's signal path, simplified for the OP-XY's CPU. Each simplification was kept only if
+`compare.py` still passed against the float reference on every setting.
+
 - **FM core at 1x.** The reference runs its core at 2x with a half-band decimator. Here it runs at 1x with the 2x
   rate's quantities: op2's sample difference halved, the carrier's phase offset doubled, and the one-poles at their
-  1x coefficient. Against the 2x build, `compare.py` passes even at C8 with RATIO 1 (worst band 1.1 dB). Against
-  the reference, the 1x port scores as the 2x port did on every setting, the largest change being 0.15 dB of
-  spectrum on `extreme_a`. The 2x version is in git history (the first commit).
-- **Modes** are the reference's two-pole resonators. Each stores `2 - 2 r cos th` and `1 - r^2` as Q31 coefficients
-  rather than `2 r cos th` and `r^2`, so a mode at 20 Hz holds its coefficient to 1 part in 18,000. Their
-  coefficients are made per note and per knob change; the make-up gain eases per block.
-- **Filters** are RBJ biquads in direct form I, stored the same way near their poles.
-- **The second fixed low-pass** runs before the resonator: the chain after the FM core is linear. STRIKE, which the
-  reference sends through it after the modes, goes through it in its table instead.
+  1x coefficient. While op2 is below 260 Hz (RATIO low, as in the default sound), op2 and its one-poles run at half
+  rate, with its feedback extrapolated to where the 2x core would read it. Above that, half rate cost up to 3 dB at
+  the onset of high notes, so it isn't used there.
+- **Modes** are the reference's two-pole resonators, run undamped with their decay (`r^16`) applied every 16
+  samples. Each takes its input once per two samples as the pair's sum, with its gain corrected by `1/cos(th/2)`. That
+  is 1.5 multiplies per mode-sample instead of 3. Low modes keep `2 - 2 cos th` as a Q31 coefficient, so a mode at
+  20 Hz holds its tuning to about 0.05 cents. Modes run in pairs, sharing the input and the accumulator.
+- **Both fixed low-passes** (20.7 kHz, Q 0.2) are one 3-tap linear-phase FIR (1 multiply), within 0.7 dB to 8 kHz
+  and 1.3 dB to 16 kHz of the pair. It runs before the resonator: the chain after the FM core is linear. STRIKE, which
+  the reference sends through the second low-pass after the modes, goes through the exact low-pass in its table.
+- **Filters** are RBJ biquads in direct form I, stored near their poles as `2 + a1` and `1 - a2`. The high-passes run
+  unnormalised (2 multiplies each). The presence peak runs as x plus a band-pass of Q·A, which is exactly the RBJ peak
+  (3 multiplies). Their gains, the dry share and the output gain all live in the shelf's coefficients.
+- **Not simplified:** both keytracked high-passes. Folding the second one into the modes' gains failed `compare.py`
+  (onsets of the drop, mid ratios): it shapes the FM's content below the note, which is not modal.
 - **Transcendentals and divisions** happen only in set-up, made of table sine, log2 and exp2 (`fixmath.h`).
 - **Output:** the loudest reference setting (RATIO 1) peaks at 0.127 of full scale, about 1/8 as 2op FM does
   (gain 143). The declared peak is 3/16 full scale.
 
+The 2x-core version and the first 1x version are earlier commits.
+
 ## CPU
 
-`sdk.py test` estimates **about 50,000 to 76,000 Blackfin instructions per voice block** at the heaviest setting
-(8 modes; about 59,000 typical), against an aim of 15,000 and a risk line of 24,000. The figure varies from run to
-run on the host; 2op FM measures 11,600 to 18,900 in the same runs, so rings reads 4 to 4.7 times 2op FM.
+`sdk.py test` and the same sweep run directly give, in the SDK's estimated Blackfin instructions per voice block:
 
-Counting instructions with the Q31 multiply as the one instruction it is on the Blackfin (valgrind), rings is
-18,000 per block at its defaults and 25,000 with 8 modes. 2op FM is 5,600 by the same count. A pitch bend that re-runs
-the note set-up every block adds about 7,000. So a rings voice costs about 3 to 4.5 times a 2op FM voice. The work is
-the voice itself: an FM core, six biquads and up to eight resonators per sample. No device measurement has been made.
+| Setting | Now | Before simplifying |
+| --- | --- | --- |
+| The defaults (2 modes) | about 18,000 | about 45,000 |
+| Heaviest: MODES at 8 | about 33,000 | about 59,000 |
+
+The aim is 15,000, and above 24,000 audio may drop with several voices; 2op FM reads 11,000 to 15,000 in the same
+runs. Each mode adds about 2,400, and the rest of the voice is about 13,000. Counting instructions with the Q31
+multiply as the one instruction it is on the Blackfin (valgrind), rings is 14,200 per block at its defaults and
+19,500 with 8 modes; 2op FM is 5,600 by that count. A pitch bend that re-runs the note set-up every block adds about
+7,000. No device measurement has been made.
 
 ## Voices
 

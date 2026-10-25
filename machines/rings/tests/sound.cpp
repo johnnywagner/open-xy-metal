@@ -1,16 +1,15 @@
 // rings' own sound checks, compiled for the host and run by `python ../open-xy/sdk.py test --machine machines/rings`.
 //
-// The reference engine (port-kit/engine/rings.c) is compiled into this test twice: as it is (float, the spec), and
-// in double precision, the same formulas without float32 rounding and with the machine's 1x FM core (core_block_1x
-// below; the reference runs its core at 2x). Every render in port-kit/reference/manifest.json
-// is rendered through the Q31 port and through the reference as this machine runs it (ATTACK 0, SUSTAIN 1: on the
-// device the stock amp envelope shapes the sound), and compared sample by sample at four stages: the FM core, the
-// resonator's drive, the mix after the modes, and the output.
+// The reference engine (port-kit/engine/rings.c) is compiled into this test twice: as it is (float, the spec), and in
+// double precision, where the machine's own algorithm is built on the reference's state and set-up (dbl::block_lite:
+// the 1x FM core with op2 at half rate when slow, the merged low-pass FIR, the modes run undamped and fed in pairs). Every render in
+// port-kit/reference/manifest.json goes through the Q31 port and that model, as the machine runs it (ATTACK 0,
+// SUSTAIN 1: on the device the stock amp envelope shapes the sound), and they are compared sample by sample at four
+// stages: the FM core, the resonator's drive, the mix after the modes, and the output. That checks the fixed point.
 //
-// The checks are against the double-precision model: it is the port's own algorithm, so it can be held to a tight
-// sample-level match. The float reference's own float32 rounding (each mode's 2 r cos th, op2's increment) puts it a
-// few cents and a few LSB from its formulas, and the 1x core's phase differs from the 2x core's half-band, so the SNR
-// against the float reference (printed alongside) is lower; tools/check_renders.py judges that with compare.py.
+// Whether the simplified algorithm is still the reference's sound is compare.py's question: tools/check_renders.py
+// renders the port and the float reference (this test, with an output folder) and compares them. The sample-level
+// SNR against the float reference is printed alongside, for scale.
 //
 //   sound            the checks: per-stage SNR, peak bound, a held bend with retriggers; exit 1 on failure
 //   sound OUTDIR     also write OUTDIR/<name>.wav (the port, 32-bit PCM) and OUTDIR/<name>.ref.wav (the float
@@ -38,6 +37,8 @@ namespace dbl {
 #define log2f log2
 #define fabsf fabs
 #define floorf floor
+#define cosf cos
+#define sinf sin
 #define rings_init dbl_rings_init
 #define rings_set_knob dbl_rings_set_knob
 #define rings_set_gain dbl_rings_set_gain
@@ -46,8 +47,9 @@ namespace dbl {
 #define rings_process dbl_rings_process
 #define rings_active dbl_rings_active
 #include "../../../port-kit/engine/rings.c"
-// The machine's FM core runs at 1x with the 2x rate's quantities (engine.cpp, core_step): the same, in double
-// precision, on the reference's own state and helpers.
+// The machine's FM core runs at 1x with the 2x rate's quantities, op2 at half rate below 260 Hz (engine.cpp,
+// core_step): the same, in double precision, on the reference's own state and helpers.
+static float s2pp_state;                             // op2 two steps back (reset per render)
 static void core_block_1x(rings_t* v, float* x)
 {
     double incd = note_hz(v->note) / v->fs;
@@ -67,18 +69,131 @@ static void core_block_1x(rings_t* v, float* x)
     v->bite_t += (float)RINGS_BLOCK / v->fs;
     uint32_t inc = v->inc_prev; const int32_t dinc = (int32_t)(inc0 - v->inc_prev) / RINGS_BLOCK;
     uint32_t ph0 = v->ph0, ph2 = v->ph2;
-    float s2p = v->s2_prev, l1 = v->lp1, l2 = v->lp2;
-    for (int k = 0; k < RINGS_BLOCK; ++k) {
-        ph2 += inc2;
-        const float s2 = sinu(ph2 + cyc2u(fb * s2p));
-        const float d = clip1(0.5f * (s2 - s2p)); s2p = s2;
-        const float m = l1; l1 = 0.25f * l1 + 0.75f * d;
-        const float u = l2; l2 = 0.25f * l2 + 0.75f * clip1(depth * m);
-        inc += (uint32_t)dinc;
-        x[k] = 0.0625f * sinu(ph0);
-        ph0 += inc + 2u * cyc2u(0.25f * u);
+    float s2p = v->s2_prev, l1 = v->lp1, l2 = v->lp2, s2pp = s2pp_state;
+    if (inc2 < (uint32_t)rings::OP2_HALF_RATE) {
+        for (int k = 0; k < RINGS_BLOCK; k += 2) {    // op2 and its one-poles at half rate
+            ph2 += 2u * inc2;
+            const float fbx = s2p + 0.75f * (s2p - s2pp);
+            const float s2 = sinu(ph2 + cyc2u(fb * fbx));
+            const float d = clip1(0.25f * (s2 - s2p)); s2pp = s2p; s2p = s2;
+            const float m = l1; l1 = l1 / 16.f + 15.f / 16.f * d;
+            const float u = l2; l2 = l2 / 16.f + 15.f / 16.f * clip1(depth * m);
+            for (int i = 0; i < 2; ++i) {
+                inc += (uint32_t)dinc;
+                x[k + i] = 0.0625f * sinu(ph0);
+                ph0 += inc + 2u * cyc2u(0.25f * u);
+            }
+        }
+    } else {
+        for (int k = 0; k < RINGS_BLOCK; ++k) {
+            ph2 += inc2;
+            const float s2 = sinu(ph2 + cyc2u(fb * s2p));
+            const float d = clip1(0.5f * (s2 - s2p)); s2pp = s2p; s2p = s2;
+            const float m = l1; l1 = 0.25f * l1 + 0.75f * d;
+            const float u = l2; l2 = 0.25f * l2 + 0.75f * clip1(depth * m);
+            inc += (uint32_t)dinc;
+            x[k] = 0.0625f * sinu(ph0);
+            ph0 += inc + 2u * cyc2u(0.25f * u);
+        }
     }
+    s2pp_state = s2pp;
     v->ph0 = ph0; v->ph2 = ph2; v->s2_prev = s2p; v->lp1 = l1; v->lp2 = l2; v->inc_prev = inc0;
+}
+// The machine's MODAL (engine.cpp): the reference's modes, set up as it sets them up, run undamped with their decay
+// applied every 16 samples, fed the pair sum x[n] + x[n+1] every other sample (b / cos(th/2)), and struck with the
+// pulse through the fixed low-pass (the engine's STRIKE table, back in the reference's units).
+static void modal_block_lite(rings_t* v, float* x)
+{
+    if (v->stretch != v->rkey_stretch || v->note != v->rkey_note) modal_setup(v);
+    float wk[8];
+    for (int k = 0; k < 8; ++k) { const float w = v->modes - (float)k; wk[k] = k == 0 ? 1.f : (w > 1.f ? 1.f : (w < 0.f ? 0.f : w)); }
+    const float T = 0.1f * powf(100.f, RDECAY);
+    v->rT = 1.f;
+    const float mix = WET, dry = 1.f - mix;
+    const int pulse = (int)(sizeof rings::STRIKE / sizeof rings::STRIKE[0]);
+    const int at = (int)(v->rst * v->fs + 0.5f);
+    float pl[RINGS_BLOCK]; int strike = 0;
+    for (int n = 0; n < RINGS_BLOCK; ++n) {
+        pl[n] = at + n < pulse ? rings::STRIKE[at + n] / 2147483648.0 * (DIST_PAD * G_FM) : 0.f;
+        strike |= pl[n] != 0.f;
+    }
+    const float Wp = 0.001f * powf(0.2f, RTONE);
+    const float f0n = (float)note_hz(v->note), ny = 0.45f * v->fs;
+    v->rst += (float)RINGS_BLOCK / v->fs;
+    float fk[8], ek[8], wsum = 0.f;
+    for (int k = 0; k < 8; ++k) {
+        float f = f0n * v->rr[k];
+        float edge = 1.f;
+        if (f < 40.f) { edge = (f - 20.f) / 20.f; if (edge < 0.f) edge = 0.f; f = f < 20.f ? 20.f : f; }
+        if (f > ny * 0.9f) { const float e2 = (ny - f) / (0.1f * ny); edge *= e2 < 0.f ? 0.f : e2; if (f > ny) f = ny; }
+        fk[k] = f; ek[k] = edge; wsum += sqrtf(v->ra[k]) * edge * wk[k];
+    }
+    if (wsum < 1e-6f) wsum = 1.f;
+    float mkg[8];
+    {
+        const float f2 = v->frq2 >= 127.f ? 1.f : v->frq2 / 128.f, rfm = 4.f * f2 * f2;
+        const float fq = f0n;
+        const float sp = fq * (rfm > 0.05f ? rfm : 1.f), kk = 1.f - expf(-(float)RINGS_BLOCK / (v->fs * 0.02f));
+        for (int k = 0; k < 8; ++k) {
+            const float bw = 6.9078f / (3.14159265f * T * v->rt[k] * v->rT) + 1.f;
+            float dm = fabsf(f0n * v->rm[k] - f0n); dm -= sp * floorf(dm / sp); if (dm > 0.5f * sp) dm = sp - dm;
+            float da = fabsf(fk[k] - fq); da -= sp * floorf(da / sp); if (da > 0.5f * sp) da = sp - da;
+            const float cm = 1.f / sqrtf(1.f + 4.f * dm * dm / (bw * bw)), ca = 1.f / sqrtf(1.f + 4.f * da * da / (bw * bw));
+            float mk = cm / ca; if (mk > 8.f) mk = 8.f; if (mk < 0.125f) mk = 0.125f;
+            const float up = fk[k] / (fq * v->rm[k]);
+            if (up > 1.f) { float t = powf(up, 0.75f); mk *= t > 4.f ? 4.f : t; }
+            if (v->rmk[k] <= 0.f) v->rmk[k] = mk;
+            v->rmk[k] += kk * (mk - v->rmk[k]); mkg[k] = v->rmk[k];
+        }
+    }
+    float y[RINGS_BLOCK] = {0};
+    for (int k = 0; k < 8; ++k) {
+        const float f = fk[k], edge = ek[k];
+        if (edge <= 0.f) { v->ry1[k] = v->ry2[k] = 0.f; continue; }
+        if (wk[k] <= 0.f && v->ry1[k] == 0.f && v->ry2[k] == 0.f) continue;
+        const float Tk = T * v->rt[k];
+        const float r = expf(-6.9078f / (Tk * v->fs)), th = 6.2831853f * f / v->fs;
+        const float c1 = 2.f * cosf(th);
+        const float M = sqrtf(1.f - 2.f * r * cosf(2.f * th) + r * r);
+        const float b = (1.f - r) * M * v->ra[k] * RES_GAIN * edge * mkg[k] * wk[k] / cosf(0.5f * th);
+        const float bi = strike ? sinf(th) * sqrtf(v->ra[k]) * RES_GAIN * edge * wk[k] * 2.f / (Wp * v->fs * wsum) : 0.f;
+        float y1 = v->ry1[k], y2 = v->ry2[k];
+        for (int n = 0; n < RINGS_BLOCK; n += 2) {
+            const float a = c1 * y1 - y2 + b * (x[n] + x[n + 1]) + bi * pl[n];
+            const float z = c1 * a - y1 + bi * pl[n + 1];
+            y[n] += a; y[n + 1] += z; y2 = a; y1 = z;
+        }
+        const float d = powf(r, (float)RINGS_BLOCK);
+        v->ry1[k] = y1 * d; v->ry2[k] = y2 * d;
+    }
+    for (int n = 0; n < RINGS_BLOCK; ++n) x[n] = dry * x[n] + mix * y[n];
+}
+// The machine's whole block (engine.cpp) on the reference's state, in double precision, with its stages in the
+// port's units. fir holds the low-pass FIR's last two inputs.
+static void block_lite(rings_t* v, float* fir, double* tap[4], int at)
+{
+    float x[RINGS_BLOCK];
+    core_block_1x(v, x);
+    for (int n = 0; n < RINGS_BLOCK; ++n) tap[0][at + n] = x[n];
+    float e1, o1; adsr_block(v, &e1, &o1);
+    const float e0 = v->ex_prev, o0 = v->eo_prev; v->ex_prev = e1; v->eo_prev = o1;
+    const float gs = DIST_PAD * G_FM, h = rings::LP_FIR / 2147483648.0;
+    const float b0 = v->hp1.b0;
+    for (int n = 0; n < RINGS_BLOCK; ++n) {
+        const float g = e0 + (e1 - e0) * (float)(n + 1) / RINGS_BLOCK;
+        const float in = x[n] * g * gs;
+        const float lp = fir[1] + h * (fir[0] + in - 2.f * fir[1]);
+        fir[0] = fir[1]; fir[1] = in;
+        x[n] = bq_run(&v->pk, bq_run(&v->hp1, lp));
+        tap[1][at + n] = x[n] / (gs * b0);
+    }
+    modal_block_lite(v, x);
+    for (int n = 0; n < RINGS_BLOCK; ++n) tap[2][at + n] = x[n] / ((1.f - WET) * gs * b0);
+    const float gsx = DIST_PAD * G_FX * v->outgain;
+    for (int n = 0; n < RINGS_BLOCK; ++n) {
+        const float g = o0 + (o1 - o0) * (float)(n + 1) / RINGS_BLOCK;
+        tap[3][at + n] = bq_run(&v->hs, bq_run(&v->hp2, x[n] * g * gsx));
+    }
 }
 #undef float
 #undef expf
@@ -88,6 +203,8 @@ static void core_block_1x(rings_t* v, float* x)
 #undef log2f
 #undef fabsf
 #undef floorf
+#undef cosf
+#undef sinf
 #undef rings_init
 #undef rings_set_knob
 #undef rings_set_gain
@@ -102,8 +219,6 @@ namespace {
 
 const double GAIN = 143.0;             // the machine's output gain against the reference page's
 const opxy::i32 DECLARED_PEAK = 402653184;   // definition.json outputPeakQ31 (3/16 full scale)
-// The dry share of the mix at the machine's gain (the port carries it into the modes' drive).
-const double DRY = (1.0 - WET) * -(DIST_PAD * G_FX) * GAIN / 8.0;
 
 struct Setting { const char* name; int note; double drop, ratio, stretch, modes; };
 // port-kit/reference/manifest.json. The envelope renders (attack, decay, sustain) are the defaults here: the stock
@@ -145,44 +260,33 @@ enum { T_CORE, T_DRIVE, T_MIX, T_OUT, T_COUNT };
 
 opxy::i32 word(double knob) { return static_cast<opxy::i32>(std::floor(knob * 2147483647.0 + 0.5)); }
 
-// The reference, one 16-sample block, with its stages scaled to the port's units. R is the float or the
-// double-precision build; its own helpers are found through its namespace.
-// The port runs the reference's second fixed low-pass ahead of the modes (the chain is linear), so the reference's
-// drive and mix are compared through that low-pass too: lp[0] and lp[1].
-template <class R, class S, class B> void reference_block(R* v, void (*core)(R*, S*), B* lp, double* tap[T_COUNT], int at) {
-    S x[RINGS_BLOCK];
-    core(v, x);
-    for (int n = 0; n < RINGS_BLOCK; ++n) tap[T_CORE][at + n] = 2.0 * x[n];    // the port's core is 2x x
-    S e1, o1; adsr_block(v, &e1, &o1);
-    const S e0 = v->ex_prev, o0 = v->eo_prev; v->ex_prev = e1; v->eo_prev = o1;
-    const S gs = DIST_PAD * G_FM;
-    for (int n = 0; n < RINGS_BLOCK; ++n) {
-        const S g = e0 + (e1 - e0) * (S)(n + 1) / RINGS_BLOCK;
-        x[n] = bq_run(&v->pk, bq_run(&v->lp1f, bq_run(&v->hp1, x[n] * g * gs)));
-        tap[T_DRIVE][at + n] = -8.0 * DRY * bq_run(&lp[0], x[n]);   // with the dry share; the port drops both stages' negative signs
-    }
-    modal_block(v, x);
-    for (int n = 0; n < RINGS_BLOCK; ++n) tap[T_MIX][at + n] = DIST_PAD * G_FX * GAIN * bq_run(&lp[1], x[n]);   // output gain folded in
-    const S gsx = DIST_PAD * G_FX * v->outgain;
-    for (int n = 0; n < RINGS_BLOCK; ++n) {
-        const S g = o0 + (o1 - o0) * (S)(n + 1) / RINGS_BLOCK;
-        tap[T_OUT][at + n] = bq_run(&v->hs, bq_run(&v->lp2f, bq_run(&v->hp2, x[n] * g * gsx)));
-    }
+// The double-precision model of the machine (dbl::block_lite) over a setting.
+void model_run(const Setting& s, double* tap[T_COUNT]) {
+    static dbl::rings_t v;
+    double fir[2] = {0, 0};
+    dbl::dbl_rings_init(&v, 44100.f);
+    dbl::s2pp_state = 0;
+    const double knobs[4] = {s.drop, s.ratio, s.stretch, s.modes};
+    for (int k = 0; k < 4; ++k) dbl::dbl_rings_set_knob(&v, (dbl::rings_knob)k, knobs[k]);
+    dbl::dbl_rings_set_knob(&v, dbl::RINGS_ATTACK, 0.0);
+    dbl::dbl_rings_set_knob(&v, dbl::RINGS_SUSTAIN, 1.0);   // no envelope of the voice's own
+    dbl::dbl_rings_set_gain(&v, GAIN);
+    dbl::dbl_rings_note_on(&v, s.note);
+    v.inc_prev *= 2;                                   // the drop's start at 1x
+    for (int at = 0; at < N; at += RINGS_BLOCK) dbl::block_lite(&v, fir, tap, at);
 }
-template <class R, class S, class B, class Init, class Knob, class Gain, class On>
-void reference_run(const Setting& s, void (*core)(R*, S*), bool one_x, double* tap[T_COUNT], Init init, Knob knob,
-                   Gain gain, On on) {
-    static R v;
-    B lp[2];
-    for (int i = 0; i < 2; ++i) bq_set(&lp[i], 0, LP_FC, LP_Q, 44100.f);
-    init(&v, 44100.f);
-    knob(&v, 0, s.drop); knob(&v, 1, s.ratio); knob(&v, 2, s.stretch); knob(&v, 3, s.modes);
-    knob(&v, 4, 0.0);                                  // ATTACK 0
-    knob(&v, 6, 1.0);                                  // SUSTAIN 1: no envelope of the voice's own
-    gain(&v, GAIN);
-    on(&v, s.note);
-    if (one_x) v.inc_prev *= 2;                       // the drop's start at 1x
-    for (int at = 0; at < N; at += RINGS_BLOCK) reference_block<R, S, B>(&v, core, lp, tap, at);
+// The float reference as it is, as the machine runs it (ATTACK 0, SUSTAIN 1), at the machine's gain.
+void spec_run(const Setting& s, double* out, float* buffer) {
+    static rings_t v;
+    rings_init(&v, 44100.f);
+    const double knobs[4] = {s.drop, s.ratio, s.stretch, s.modes};
+    for (int k = 0; k < 4; ++k) rings_set_knob(&v, (rings_knob)k, knobs[k]);
+    rings_set_knob(&v, RINGS_ATTACK, 0.0);
+    rings_set_knob(&v, RINGS_SUSTAIN, 1.0);
+    rings_set_gain(&v, (float)GAIN);
+    rings_note_on(&v, s.note);
+    rings_process(&v, buffer, N);
+    for (int i = 0; i < N; ++i) out[i] = buffer[i];
 }
 
 double note_hz_ref(int n) { return 440.0 * std::exp2((n - 69) / 12.0) * TUNE_RATIO; }
@@ -225,12 +329,9 @@ Result run(const Setting& s, double* port[T_COUNT], double* exact[T_COUNT], doub
             if (a > r.peak) r.peak = a;
         }
     }
-    reference_run<dbl::rings_t, double, dbl::rings_biquad>(s, dbl::core_block_1x, true, exact, dbl::dbl_rings_init,
-        [](dbl::rings_t* v, int k, double x) { dbl::dbl_rings_set_knob(v, (dbl::rings_knob)k, x); },
-        [](dbl::rings_t* v, double g) { dbl::dbl_rings_set_gain(v, g); }, dbl::dbl_rings_note_on);
-    reference_run<rings_t, float, rings_biquad>(s, core_block, false, spec, rings_init,
-        [](rings_t* v, int k, double x) { rings_set_knob(v, (rings_knob)k, x); },
-        [](rings_t* v, double g) { rings_set_gain(v, (float)g); }, rings_note_on);
+    model_run(s, exact);
+    static float buffer[N];
+    spec_run(s, spec[T_OUT], buffer);
     for (int k = 0; k < T_COUNT; ++k) r.snr[k] = snr(port[k], exact[k], 0);
     r.snr_float = snr(port[T_OUT], spec[T_OUT], 0);
     return r;
