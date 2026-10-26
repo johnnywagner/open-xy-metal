@@ -16,6 +16,11 @@ inline i32 half(i32 a) { return opxy::q31::half(a); }
 inline i32 sar(i32 a, int n) { return a >= 0 ? a >> n : ~((~a) >> n); }
 inline i32 clamp(i32 v, i32 lo, i32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 inline i32 absolute(i32 v) { return v < 0 ? -v : v; }
+// a + b, saturated where it would wrap.
+inline i32 add_sat(i32 a, i32 b) {
+    const i32 s = static_cast<i32>(static_cast<u32>(a) + static_cast<u32>(b));
+    return ((a ^ s) & (b ^ s)) < 0 ? (a >> 31) ^ MAX : s;
+}
 // Products with coefficients stored with fewer integer bits: Q30 (|c| < 2) and Q29 (|c| < 4).
 inline i32 mul30(i32 a, i32 c) { return mul(a, c) * 2; }
 inline i32 mul29(i32 a, i32 c) { return mul(a, c) * 4; }

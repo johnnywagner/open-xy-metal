@@ -29,6 +29,8 @@
 // and exp2 (fixmath.h). No float, no division and no 64-bit arithmetic in the audio path. Recursive filters and the
 // low modes keep the small quantities near their poles as their coefficients (2 + a1, 1 - a2, 2 - 2 cos th), so low
 // notes keep their precision. Signed right shifts are arithmetic (GCC and Clang define them so).
+// Where a voice struck again and again would carry a sum past the 32-bit range, it saturates instead of wrapping, and
+// everything else is as exact as before (the mix's two passes, hot modes, band, fir_tail, ceiling2; README: Overflow).
 #include "core.h"
 #include "fixmath.h"
 
@@ -38,9 +40,10 @@ namespace {
 const unsigned VN = opxy::block_frames / 2;   // voice samples per block
 const unsigned STEP = 8;                       // voice samples per step: the reference's 16-sample sub-block
 const unsigned STEPS = VN / STEP;
+const u32 CHAIN_TOP = 660000000u;             // 6.78 kHz as an increment: the chain's highest note (setup_pitch)
+const i32 HOT = 0x66666666;                    // a mode this loud (0.8 of full scale) runs held (hot)
 
 inline i32 knob_word(i32 w) { return w < 0 ? 0 : w; }
-inline i32 mul27(i32 a, i32 c) { return mul(a, c) * 16; }
 // sin from the 4096-point Q15 table, no interpolation, scaled to Q(15 + s).
 template <int S> inline i32 sin16(u32 phase) { return static_cast<i32>(SINE16[phase >> 20]) * (1 << S); }
 
@@ -110,7 +113,9 @@ __attribute__((noinline)) void set_modes(Voice& v, i32 x) {
 void setup_pitch(Voice& v, u32 inc) {
     v.setup_inc = inc;
     v.linc = log2u(inc) + ONE_LOG;                    // the note as a voice-rate increment
-    setup_chain(v, inc < 0x40000000u ? 2u * inc : 0x7fffffffu);   // warped at the voice rate
+    // Warped at the voice rate. From 6.79 kHz a sum in setup_chain would leave the 32-bit range (and from about 7.8 kHz
+    // the band's poles the unit circle): the chain stays at 6.78 kHz's.
+    setup_chain(v, 2u * (inc < CHAIN_TOP ? inc : CHAIN_TOP));
 }
 // Where the modes sit: frequency (as a voice-rate increment), edge fade, oscillator coefficient and feed, for the pitch
 // and STRETCH. The modes run undamped per voice sample; their decay is applied every step (DAMP16).
@@ -137,6 +142,8 @@ __attribute__((noinline)) void setup_modes(Voice& v) {
         i32 h, c; half_angle(fk, h, c);
         const i32 sn = 2 * mul(h, c);                   // sin th
         v.sn[k] = sn;
+        const i32 hs = mul(sn, HOT) >> 1;                 // hot's limit: (HOT sin th / 2)^2
+        v.lim[k] = mul(hs, hs);
         v.lch[k] = log2q(c, 31);                        // log2 cos(th / 2)
         if (fk < static_cast<u32>(INC_QUARTER)) v.pair |= 1u << k;
         if (fk < static_cast<u32>(INC_SIXTH)) {
@@ -294,30 +301,83 @@ void core_step(Voice& v, i32* x, u32 base, i32 ratio) {
 // ---------------------------------------------------------------- MODAL
 // Modes run undamped: y = 2 cos th y1 - y2, plus the input (and STRIKE); their decay, r^8, is applied every step.
 // HIGH modes keep 2 cos th in Q30; low ones keep 2 - 2 cos th in Q31.
-struct Mode { i32 y1, y2, c, b, damp; };
+struct Mode { i32 y1, y2, c, b, damp, lim; };
 template <bool HIGH> inline i32 osc(i32 y1, i32 y2, i32 c) { return (HIGH ? mul30(y1, c) : 2 * y1 - mul(y1, c)) - y2; }
+// The same plus an input v, saturated where it would leave the 32-bit range and exact everywhere else: struck again and
+// again while it rings, a mode can build up past full scale. yc is y / 8 to within 4 below: over 2^30 either way, y has
+// wrapped if its sign disagrees, and has surely wrapped past 3 2^30.
+template <bool HIGH> inline i32 osc_held(i32 y1, i32 y2, i32 c, i32 v) {
+    const i32 m = mul(y1, c);
+    const i32 y = static_cast<i32>((HIGH ? 2u * static_cast<u32>(m) : 2u * static_cast<u32>(y1) - static_cast<u32>(m))
+                                   - static_cast<u32>(y2) + static_cast<u32>(v));
+    const i32 yc = (HIGH ? m >> 2 : (y1 >> 2) - (m >> 3)) - (y2 >> 3) + (v >> 3);
+    if (yc > (1 << 27)) return yc >= (3 << 27) || y < 0 ? MAX : y;
+    if (yc < -(1 << 27)) return yc < -(3 << 27) || y >= 0 ? -MAX : y;
+    return y;
+}
+// Whether a mode could reach full scale within a step: its amplitude A at HOT or more, from the state:
+// (A sin th / 2)^2 = ((y1 - y2)^2 + (2 - 2 cos th) y1 y2) / 4 (low modes; y1^2 + y2^2 - 2 cos th y1 y2 for high ones),
+// against the mode's limit (setup_modes). A mode grows by under 3% of full scale a step (11% a block) and one note
+// alone stays below 0.75, so a mode that is not hot cannot reach full scale before the next look.
+template <bool HIGH> inline bool hot(const Mode& m) {
+    const i32 a = m.y1 >> 1, b = m.y2 >> 1;
+    const i32 q = HIGH ? mul(a, a) + mul(b, b) - mul30(mul(a, b), m.c) : mul(a - b, a - b) + mul(mul(a, b), m.c);
+    return q > m.lim;
+}
+
+// floor(d / 32) + floor(d / 1024) for d = a - b, which itself would wrap: floor((a - b) / 2^k) is
+// (a >> k) - (b >> k), less 1 where a's low k bits are below b's.
+inline i32 fir_tail(i32 a, i32 b) {
+    return (a >> 5) - (b >> 5) - ((a & 31) < (b & 31)) + (a >> 10) - (b >> 10) - ((a & 1023) < (b & 1023));
+}
+
+// The mix's accumulator. Adding a mode wraps where the 32-bit range ends, which leaves the sum exact as long as each
+// sample's total is in range, whatever the partial sums did on the way. The first pass only notes whether a partial sum
+// wrapped (rarely: a voice struck again and again); then a second pass counts each sample's wraps, and a sample whose
+// count is not zero is out of range and saturates (process).
+struct Note {                                          // the first pass
+    i32 any;                                           // negative once a partial sum has wrapped
+    // ov collects a step's wraps, kept in a register
+    inline void add(i32* p, i32 y, i32& ov) const {
+        const i32 a = *p, s = static_cast<i32>(static_cast<u32>(a) + static_cast<u32>(y));
+        ov |= (a ^ s) & (y ^ s);
+        *p = s;
+    }
+};
+struct Count {                                         // the second
+    i32 any;
+    const i32* acc;
+    i32* wraps;                                        // per sample: wraps up, less wraps down
+    inline void add(i32* p, i32 y, i32&) const {
+        const i32 a = *p, s = static_cast<i32>(static_cast<u32>(a) + static_cast<u32>(y));
+        if (((a ^ s) & (y ^ s)) < 0) wraps[p - acc] += y < 0 ? -1 : 1;
+        *p = s;
+    }
+};
 
 // Modes above VR/4: the input every voice sample.
-template <bool H>
-inline void each_one_step(i32* acc, const i32* in, Mode& m) {
-    i32 y1 = m.y1, y2 = m.y2;
+template <bool H, bool HOLD, class S>
+inline void each_one_step(S& sum, i32* acc, const i32* in, Mode& m) {
+    i32 y1 = m.y1, y2 = m.y2, ov = 0;
     for (unsigned n = 0; n < STEP; ++n) {
-        const i32 y = osc<H>(y1, y2, m.c) + mul(m.b, in[n]);
-        acc[n] += y;
+        const i32 y = HOLD ? osc_held<H>(y1, y2, m.c, mul(m.b, in[n])) : osc<H>(y1, y2, m.c) + mul(m.b, in[n]);
+        sum.add(acc + n, y, ov);
         y2 = y1; y1 = y;
     }
+    sum.any |= ov;
     m.y1 = mul(y1, m.damp); m.y2 = mul(y2, m.damp);
 }
 // Modes below VR/4: the input once per two voice samples, the pair's sum (in: STEP / 2 sums, acc: STEP samples).
-template <bool H>
-inline void one_step(i32* acc, const i32* in, Mode& m) {
-    i32 y1 = m.y1, y2 = m.y2;
+template <bool H, bool HOLD, class S>
+inline void one_step(S& sum, i32* acc, const i32* in, Mode& m) {
+    i32 y1 = m.y1, y2 = m.y2, ov = 0;
     for (unsigned n = 0; n < STEP / 2; ++n) {
-        i32 y = osc<H>(y1, y2, m.c) + mul(m.b, in[n]);
-        i32 z = osc<H>(y, y1, m.c);
-        acc[2 * n] += y; acc[2 * n + 1] += z;
+        const i32 y = HOLD ? osc_held<H>(y1, y2, m.c, mul(m.b, in[n])) : osc<H>(y1, y2, m.c) + mul(m.b, in[n]);
+        const i32 z = HOLD ? osc_held<H>(y, y1, m.c, 0) : osc<H>(y, y1, m.c);
+        sum.add(acc + 2 * n, y, ov); sum.add(acc + 2 * n + 1, z, ov);
         y2 = y; y1 = z;
     }
+    sum.any |= ov;
     m.y1 = mul(y1, m.damp); m.y2 = mul(y2, m.damp);
 }
 // STRIKE, in the note's first step: the pulse rings through a separate copy of the mode, which joins the mode rotated
@@ -325,14 +385,16 @@ inline void one_step(i32* acc, const i32* in, Mode& m) {
 // ring A cos(w n + phi) held as (s1, s0) = (y[n], y[n-1]), Im = (s0 - cos w s1) / sin w and the rotated ring is
 // s1' = gre s1 - gim Im, s0' = cos w s1' + gre (s0 - cos w s1) + gim sin w s1. The ring's own samples go out
 // unrotated.
-inline void strike_step(i32* acc, bool high, i32 c, i32 damp, i32 p, i32 gre, i32 gim, i32 rs, i32 lrs, i32 rc,
+template <class S>
+inline void strike_step(S& sum, i32* acc, bool high, i32 c, i32 damp, i32 p, i32 gre, i32 gim, i32 rs, i32 lrs, i32 rc,
                         i32& r1, i32& r0) {
-    i32 y1 = 0, y2 = 0;
+    i32 y1 = 0, y2 = 0, ov = 0;
     for (unsigned n = 0; n < STEP; ++n) {
         const i32 y = (high ? osc<true>(y1, y2, c) : osc<false>(y1, y2, c)) + mul(p, STRIKE[n]);
-        acc[n] += y;
+        sum.add(acc + n, y, ov);
         y2 = y1; y1 = y;
     }
+    sum.any |= ov;
     const i32 s1 = mul(y1, damp), s0 = mul(y2, damp);
     const i32 d = s0 - mul(rc, s1);
     i32 im = 0;
@@ -344,26 +406,42 @@ inline void strike_step(i32* acc, bool high, i32 c, i32 damp, i32 p, i32 gre, i3
     r1 = (mul(gre, s1) - mul(gim, im)) * 4;            // G in Q29
     r0 = mul(rc, r1) + (mul(gre, d) + mul(gim, mul(rs, s1))) * 4;
 }
-// A mode through the block: STEPS steps, the strike's rotated ring (r: y1, y2, or null) joining after the first.
-template <bool H>
-inline void one_block(i32* acc, const i32* in, Mode& m, const i32* r) {
-    for (unsigned j = 0; j < STEPS; ++j) {
-        one_step<H>(acc + j * STEP, in + j * (STEP / 2), m);
-        if (r && !j) { m.y1 += r[0]; m.y2 += r[1]; }
-    }
+// A mode through the block: STEPS steps, the strike's rotated ring (r: y1, y2, or null) joining after the first. Hot or
+// not is settled for the block, and again after a strike joins.
+template <bool H, bool HOLD, class S>
+inline void one_steps(S& sum, i32* acc, const i32* in, Mode& m, unsigned j) {
+    for (; j < STEPS; ++j) one_step<H, HOLD>(sum, acc + j * STEP, in + j * (STEP / 2), m);
 }
-template <bool H>
-inline void each_one_block(i32* acc, const i32* x, Mode& m, const i32* r) {
-    for (unsigned j = 0; j < STEPS; ++j) {
-        each_one_step<H>(acc + j * STEP, x + j * STEP, m);
-        if (r && !j) { m.y1 += r[0]; m.y2 += r[1]; }
+template <bool H, class S>
+inline void one_block(S& sum, i32* acc, const i32* in, Mode& m, const i32* r) {
+    unsigned j = 0;
+    if (r) {
+        if (hot<H>(m)) one_step<H, true>(sum, acc, in, m); else one_step<H, false>(sum, acc, in, m);
+        m.y1 = add_sat(m.y1, r[0]); m.y2 = add_sat(m.y2, r[1]);
+        j = 1;
     }
+    if (hot<H>(m)) one_steps<H, true>(sum, acc, in, m, j); else one_steps<H, false>(sum, acc, in, m, j);
+}
+template <bool H, bool HOLD, class S>
+inline void each_one_steps(S& sum, i32* acc, const i32* x, Mode& m, unsigned j) {
+    for (; j < STEPS; ++j) each_one_step<H, HOLD>(sum, acc + j * STEP, x + j * STEP, m);
+}
+template <bool H, class S>
+inline void each_one_block(S& sum, i32* acc, const i32* x, Mode& m, const i32* r) {
+    unsigned j = 0;
+    if (r) {
+        if (hot<H>(m)) each_one_step<H, true>(sum, acc, x, m); else each_one_step<H, false>(sum, acc, x, m);
+        m.y1 = add_sat(m.y1, r[0]); m.y2 = add_sat(m.y2, r[1]);
+        j = 1;
+    }
+    if (hot<H>(m)) each_one_steps<H, true>(sum, acc, x, m, j); else each_one_steps<H, false>(sum, acc, x, m, j);
 }
 
 // Adds each mode into acc, a mode at a time through the whole block: those fed by two (in, the drive's pair sums)
 // and those fed every sample (x, the drive). With STRIKE, the pulse goes into the modes during the note's first step,
 // shared between the audible modes by sqrt(ra).
-void modes_block(Voice& v, const i32* x, const i32* in, i32* acc, bool strike) {
+template <class S>
+void modes_block(S& sum, Voice& v, const i32* x, const i32* in, i32* acc, bool strike) {
     i32 term[MODES], lw = 0;
     if (strike) {
         i32 wsum = 0;
@@ -377,14 +455,14 @@ void modes_block(Voice& v, const i32* x, const i32* in, i32* acc, bool strike) {
         if (!v.edge[k]) continue;
         if (!v.wk[k] && !v.y1[k] && !v.y2[k]) continue;   // not fed and silent
         const bool high = (v.high >> k) & 1;
-        Mode m = {v.y1[k], v.y2[k], v.mc[k], v.b[k], DAMP16[k]};
+        Mode m = {v.y1[k], v.y2[k], v.mc[k], v.b[k], DAMP16[k], v.lim[k]};
         i32 rot[2] = {0, 0};                           // the strike's rotated ring
         if (strike && term[k])
-            strike_step(acc, high, v.mc[k], DAMP16[k], exp2q(L_BP[k] + v.lsn[k] + log2q(term[k], 31) - lw, 31),
+            strike_step(sum, acc, high, v.mc[k], DAMP16[k], exp2q(L_BP[k] + v.lsn[k] + log2q(term[k], 31) - lw, 31),
                         v.gre[k], v.gim[k], v.sn[k], v.lsn[k], v.rc[k], rot[0], rot[1]);
         const i32* r = strike ? rot : 0;
-        if ((v.pair >> k) & 1) { if (high) one_block<true>(acc, in, m, r); else one_block<false>(acc, in, m, r); }
-        else { if (high) each_one_block<true>(acc, x, m, r); else each_one_block<false>(acc, x, m, r); }
+        if ((v.pair >> k) & 1) { if (high) one_block<true>(sum, acc, in, m, r); else one_block<false>(sum, acc, in, m, r); }
+        else { if (high) each_one_block<true>(sum, acc, x, m, r); else each_one_block<false>(sum, acc, x, m, r); }
         if (!v.wk[k] && absolute(m.y1) < FLUSH && absolute(m.y2) < FLUSH) m.y1 = m.y2 = 0;
         v.y1[k] = m.y1; v.y2[k] = m.y2;
     }
@@ -393,6 +471,27 @@ void modes_block(Voice& v, const i32* x, const i32* in, i32* acc, bool strike) {
 void clear(Voice& voice) {
     u32* words = reinterpret_cast<u32*>(&voice);
     for (unsigned i = 0; i < sizeof(Voice) / sizeof(u32); ++i) words[i] = 0;
+}
+
+// One sample of the band's poles, e = 16 n + 2 e1 - e2 - 4 m2 + m3 (n: its numerator, m2 = e1 (2 + a1'),
+// m3 = e2 (1 - a2')), saturated where it would leave the 32-bit range (a voice struck again and again can drive it
+// there) and exact everywhere else. e = 4 q + (r & 3), with r = 2 (e1 & 1) + m3 - e2 and
+// q = 4 n - m2 + (e1 >> 1) + (r >> 2): r never wraps (0 < m3 / e2 <= 1), and q only far past the range (beyond four
+// times it), so q says where e is.
+inline i32 band(i32 n, i32 e1, i32 e2, i32 m2, i32 m3) {
+    const i32 r = ((e1 & 1) << 1) + (m3 - e2);
+    const u32 q = 4u * static_cast<u32>(n) - static_cast<u32>(m2) + static_cast<u32>(e1 >> 1) + static_cast<u32>(r >> 2);
+    i32 e = static_cast<i32>(4u * q + static_cast<u32>(r & 3));
+    if ((q ^ (q << 1)) >> 30) e = (static_cast<i32>(q) >> 31) ^ MAX;   // out of range: q's top three bits disagree
+    return e;
+}
+
+// 2 u at the half-scale ceiling. The allpasses can overshoot half scale (to 1.43 times it, their paths' L1 gain), so
+// 2 u saturates where it would wrap; the same as before for every u where it did not.
+inline i32 ceiling2(i32 u) {
+    const i32 v = static_cast<i32>(2u * static_cast<u32>(u));
+    if ((v ^ u) < 0) return u < 0 ? -HALF_SCALE : HALF_SCALE;   // 2 u wrapped
+    return clamp(v, -HALF_SCALE, HALF_SCALE);
 }
 
 // Taps for the machine's own tests: each stage of the last block (the voice-rate stages at 32 samples). Null in the
@@ -467,7 +566,21 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
         v.chain[0] = x1; v.chain[1] = x2; v.chain[2] = p1; v.chain[3] = p2;
     }
     // ---- MODAL, mixed with the core
-    modes_block(v, x, in, acc, strike);
+    {
+        i32 y1[MODES], y2[MODES];
+        for (unsigned k = 0; k < MODES; ++k) { y1[k] = v.y1[k]; y2[k] = v.y2[k]; }
+        Note first = {0};
+        modes_block(first, v, x, in, acc, strike);
+        if (first.any < 0) {                           // a partial sum wrapped: again from the block's start, counting
+            for (unsigned k = 0; k < MODES; ++k) { v.y1[k] = y1[k]; v.y2[k] = y2[k]; }
+            i32 wraps[VN];
+            for (unsigned n = 0; n < VN; ++n) { acc[n] = 2 * x[n]; wraps[n] = 0; }
+            Count count = {0, acc, wraps};
+            modes_block(count, v, x, in, acc, strike);
+            for (unsigned n = 0; n < VN; ++n)
+                if (wraps[n]) acc[n] = wraps[n] > 0 ? MAX : -MAX;
+        }
+    }
     if (taps) for (unsigned n = 0; n < VN; ++n) taps->mix[n] = half(acc[n]);
     // ---- the voice's output chain: low-pass FIR (a sample late; it also halves the accumulator), the onset's second
     // gain, the band; then to the output rate, two samples each: the half-band's allpass paths (on half the signal, for
@@ -478,29 +591,33 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
         i32 p0 = buf[0], p1 = buf[1];
         for (unsigned n = 0; n < VN; ++n) {
             const i32 p2 = buf[n + 2];
-            const i32 dd = (p0 >> 1) + (p2 >> 1) - p1;
-            buf[n] = (p1 >> 1) + (dd >> 5) + (dd >> 10);  // h = LP_FIR = 1/32 + 1/1024
+            const i32 hp = (p0 >> 1) + (p2 >> 1);
+            const i32 dd = static_cast<i32>(static_cast<u32>(hp) - static_cast<u32>(p1));
+            if (((hp ^ p1) & (hp ^ dd)) >= 0) buf[n] = (p1 >> 1) + (dd >> 5) + (dd >> 10);   // h = LP_FIR = 1/32 + 1/1024
+            else buf[n] = (p1 >> 1) + fir_tail(hp, p1);  // dd wrapped (a full-scale mix at the top of the band)
             p0 = p1; p1 = p2;
         }
     }
     if (shaped) for (unsigned n = 0; n < VN; ++n) buf[n] = mul(buf[n], gains[n]);
-    {   // the band, then half for the half-band's headroom, in place
-        i32 g1 = v.chain[4], g2 = v.chain[5], e1 = v.chain[6], e2 = v.chain[7];
-        const i32 k0 = v.ch_c[2], k1 = v.ch_c[3], k2 = v.ch_c[4], k3 = v.ch_c[5];
-        for (unsigned n = 0; n < VN; n += 2) {         // two samples at a time
-            const i32 ga = buf[n], gb = buf[n + 1];
-            const i32 ha = ga >> 1, hb = gb >> 1, h1 = g1 >> 1, h2 = g2 >> 1;
-            const i32 ea = mul27(ha - g1 + h2, k0) + mul27(ha - h2, k1)
-                         + static_cast<i32>(2u * static_cast<u32>(e1) - static_cast<u32>(e2))
-                         - mul29(e1, k2) + mul(e2, k3);
-            const i32 eb = mul27(hb - ga + h1, k0) + mul27(hb - h1, k1)
-                         + static_cast<i32>(2u * static_cast<u32>(ea) - static_cast<u32>(e1))
-                         - mul29(ea, k2) + mul(e1, k3);
-            g2 = ga; g1 = gb; e2 = ea; e1 = eb;
-            buf[n] = clamp(ea, -(1 << 30), 1 << 30) >> 1;
-            buf[n + 1] = clamp(eb, -(1 << 30), 1 << 30) >> 1;
+    {   // the band: its numerator from g (into x, which the drive is done with), then its poles; then half, for the
+        // half-band's headroom, in place
+        i32 g1 = v.chain[4], g2 = v.chain[5];
+        const i32 k0 = v.ch_c[2], k1 = v.ch_c[3];
+        for (unsigned n = 0; n < VN; ++n) {
+            const i32 g = buf[n];
+            const i32 hg = g >> 1, h2 = g2 >> 1;
+            x[n] = static_cast<i32>(static_cast<u32>(mul(hg - g1 + h2, k0)) + static_cast<u32>(mul(hg - h2, k1)));
+            g2 = g1; g1 = g;
         }
-        v.chain[4] = g1; v.chain[5] = g2; v.chain[6] = e1; v.chain[7] = e2;
+        v.chain[4] = g1; v.chain[5] = g2;
+        i32 e1 = v.chain[6], e2 = v.chain[7];
+        const i32 k2 = v.ch_c[4], k3 = v.ch_c[5];
+        for (unsigned n = 0; n < VN; ++n) {
+            const i32 e = band(x[n], e1, e2, mul(e1, k2), mul(e2, k3));
+            e2 = e1; e1 = e;
+            buf[n] = clamp(e, -(1 << 30), 1 << 30) >> 1;
+        }
+        v.chain[6] = e1; v.chain[7] = e2;
     }
     if (taps) for (unsigned n = 0; n < VN; ++n) taps->voice[n] = buf[n] * 2;
     {   // to the output rate: the half-band's two allpass paths, then the ceiling
@@ -510,8 +627,8 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
             const i32 t0 = mul(HB_IIR[0], s0 - a0) + h0, u0 = mul(HB_IIR[2], t0 - b0) + a0;
             const i32 t1 = mul(HB_IIR[1], s0 - a1) + h0, u1 = mul(HB_IIR[3], t1 - b1) + a1;
             h0 = s0; a0 = t0; b0 = u0; a1 = t1; b1 = u1;
-            output[2 * n] = clamp(2 * u0, -HALF_SCALE, HALF_SCALE);
-            output[2 * n + 1] = clamp(2 * u1, -HALF_SCALE, HALF_SCALE);
+            output[2 * n] = ceiling2(u0);
+            output[2 * n + 1] = ceiling2(u1);
         }
         v.hb[0] = h0; v.hb[1] = a0; v.hb[2] = b0; v.hb[3] = a1; v.hb[4] = b1;
     }

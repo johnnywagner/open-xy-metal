@@ -79,6 +79,34 @@ ceiling, by at most 0.8 dB, for a few samples; with 2 dB, 10%; with 3, 21%. Trie
 
 For more level, turn the track up on the OP-XY.
 
+## Overflow
+
+A voice struck again while it rings adds each strike to the modes, and repeated strikes in step with a mode build it up
+past full scale. The 32-bit sums used to wrap there, which turns an over into a full-scale spike of the other sign: a
+pop. At the default knobs, the same voice struck every 131 ms (16ths at about 115 BPM) wrapped on 11 of 85 notes from
+C1 to C8; every 65 ms, on 23. Now every place that could wrap saturates instead, and the output is the same sample for
+sample wherever nothing wrapped before:
+
+- **The mix.** The modes add into the mix with wrapping sums, which are exact as long as each sample's total is in
+  range, whatever the partial sums do on the way. The first pass only notes whether a partial sum wrapped; when one did
+  (rarely: a voice struck again and again), the block's modes run again counting each sample's wraps, and a sample whose
+  count is not zero saturates.
+- **The modes.** A mode at 0.8 of full scale or more (from its state, once a block and after a strike joins) runs the
+  block with each output saturated where it would wrap. A mode grows by under 3% of full scale a step and one note
+  alone stays below 0.75, so a mode below 0.8 cannot reach full scale before the next look.
+- **The band** after the modes saturates where its output would leave the 32-bit range (twice the ceiling): it is worked
+  out as a quarter of itself and the rest, and the quarter cannot wrap until four times the range.
+- **The FIR** finds its second difference by parts where it would wrap (a full-scale mix at the top of the band), and
+  **the half-band's** doubling to the output saturates where it would wrap: its allpasses can overshoot half scale, to
+  1.43 times it.
+- **The chain** stops following the note at 6.78 kHz. Above that, a sum in its set-up left the 32-bit range (which gave
+  the host and the OP-XY different coefficients), and from about 7.8 kHz its band was unstable.
+
+Checked over 36,585 settings (the knobs at three to five positions each, notes from C1 to G9, struck every 4 ms to 260 ms or once, with
+bends and knob sweeps) and the 1,875 of the CPU check's grid: the output is bit for bit the old one in every setting
+where nothing in the old engine left the 32-bit range (it did in 8,966), and nothing in the new one ever does. The
+Blackfin build renders the grid bit for bit as the host does.
+
 ## How it was checked
 
 ```sh
@@ -143,22 +171,24 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
 Blackfin instructions per voice block, counted on the GNU Blackfin simulator running the SDK's own compiler output
 (the pinned GCC 8 fork, `-mcpu=bf707 -O2`; the simulator given the Blackfin+ 32-bit multiply it lacked), at 440 Hz:
 
-| Setting | rings | before the final pass | 2op FM |
-| --- | --- | --- | --- |
-| The defaults (MODES 2), a held note | 5,930 | 8,100 | 4,900 (its defaults) |
-| The defaults, while the drop runs (up to the first 90 ms) | 6,490 | 8,850 | |
-| MODES 6 | 7,390 | 10,280 | |
-| A note-on block, a fresh voice (defaults) | 15,190 | 18,390 | |
-| A note-on block, a fresh voice (MODES 6) | 18,590 | 22,690 | |
+| Setting | rings | without the overflow guards | before the final pass | 2op FM |
+| --- | --- | --- | --- | --- |
+| The defaults (MODES 2), a held note | 7,220 | 5,930 | 8,100 | 4,900 (its defaults) |
+| The defaults, while the drop runs (up to the first 90 ms) | 7,770 | 6,490 | 8,850 | |
+| MODES 6 | 9,210 | 7,390 | 10,280 | |
+| A note-on block, a fresh voice (defaults) | 16,460 | 15,190 | 18,390 | |
+| A note-on block, a fresh voice (MODES 6) | 20,530 | 18,590 | 22,690 | |
 
-A block is 1.45 ms, about 580,000 cycles at 400 MHz: eight held voices take about 10% of it at MODES 6, and eight
-voices starting in the same block about a quarter. The Blackfin+ predicts branches, so a count of instructions is the
-fair measure; data stalls and cache misses come on top (the voice's code is 13 KB, the instruction cache 16 KB).
+A block is 1.45 ms, about 580,000 cycles at 400 MHz: eight held voices take about 13% of it at MODES 6, and eight
+voices starting in the same block about 28%. A block where a partial sum of the mix wraps (a voice built up by
+repeated strikes) runs its modes twice. The Blackfin+ predicts branches, so a count of instructions is the fair
+measure; data stalls and cache misses come on top (the voice's per-block code is about 9 KB, the instruction cache
+16 KB; the set-up and the mix's second pass add 12 KB that run only on a change or a wrap).
 
-The final pass changed no output: the port renders bit for bit what it did before, checked over a grid of 1,876
+The final pass first changed no output: the port rendered bit for bit what it did before, checked over a grid of 1,876
 settings (pitch, knobs, retriggers, knob moves, glides) on the host and on the simulator. What it did:
 
-- The output stage runs as three loops (the FIR, the band two samples at a time, the half-band) instead of one that
+- The output stage runs as separate loops (the FIR, the band's numerator, its poles, the half-band) instead of one that
   spilled most of its state; the drive's high-pass, two samples at a time, also forms the modes' input.
 - The FM core runs op2 and the carrier as separate loops, with op2's feedback carried ahead and the carrier's gliding
   increment kept as one running sum. op2's depth stays below 2, so the clamp after it was dead and went.
@@ -167,9 +197,11 @@ settings (pitch, knobs, retriggers, knob moves, glides) on the host and on the s
   distances and of the note are kept, not worked out again per note-on, per block or per step, and the set-up
   functions stay out of the per-block code.
 
-`sdk.py test` estimates about 19,400 Blackfin instructions per voice block at the heaviest setting. The estimate times
-the host, where the SDK's portable Q31 multiply takes a dozen instructions and an unpredictable branch, so it is mostly
-a count of multiplies. No device measurement has been made.
+Then the overflow guards (above) cost about a fifth of the voice back.
+
+`sdk.py test` estimates 20,000 to 30,000 Blackfin instructions per voice block at the heaviest setting, varying that
+much between runs. The estimate times the host, where the SDK's portable Q31 multiply takes a dozen instructions and an
+unpredictable branch, so it is mostly a count of multiplies. No device measurement has been made.
 
 ## Voices
 
