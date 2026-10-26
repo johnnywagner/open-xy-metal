@@ -4,30 +4,22 @@ repository root:
 
     python3 tools/gen_panel.py
 
-Twelve rings of fourteen pieces each (node 14 r + i): four quarter arcs of radius 8, from the left round to the top
+Twelve rings of nineteen pieces each (node 19 r + i): four quarter arcs of radius 8, from the left round to the top
 (display.cpp turns them for the other corners), then four vertical pieces 64 px long and two 32 px long that
-display.cpp turns across; then the sheen: three grey lenses 64 px tall and a 64 px white hairline. All start parked off screen. The palette is 16 white strokes, 0.375 px x 1.284^i wide:
+display.cpp turns across; then the sheen: a stripe and a glint in four colours, and a rim. All start parked off screen. The palette is 16 white strokes, 0.375 px x 1.284^i wide:
 display.cpp gives each piece the one that undoes its scale (WIDTHS there is this table in Q10).
 """
 import math
 from pathlib import Path
 
-RINGS, PIECES, ARC = 12, 14, 8
-# The sheen's slivers: how tall for how wide (display.cpp SLIVER) and their greys, the OP-XY's own (its screen
-# header's dark, mid and light steps).
-SLIVERS = [(6, '#4B4B4B'), (9, '#7D7D7D'), (16, '#AFAFAF')]
+RINGS, PIECES, ARC = 12, 19, 8
+# The sheen's colours, dark to light: the OP-XY's own greys (its screen header's dark, mid and light steps), then white.
+GREYS = ['#4B4B4B', '#7D7D7D', '#AFAFAF', '#FFFFFF']
 WIDTHS = [0.375 * 1.284 ** i for i in range(16)]
 
 def num(v):
     t = f'{v:.4f}'.rstrip('0').rstrip('.')
     return '0' if t in ('-0', '') else t
-
-def lens(tall):
-    # 64 px tall, 64 / tall wide at its middle, pointed at both ends
-    ys = [-32 + 4 * k for k in range(17)]
-    right = [(32 / tall * (1 - (y / 32) ** 2), y) for y in ys]
-    pts = right + [(-x, y) for x, y in reversed(right[1:-1])]
-    return 'M' + ' L'.join(f'{num(x)},{num(y)}' for x, y in pts) + ' Z'
 
 def arc():
     pts = [(-ARC * math.cos(math.radians(t)), -ARC * math.sin(math.radians(t))) for t in [i * 90 / 8 for i in range(9)]]
@@ -35,7 +27,7 @@ def arc():
 
 PARK = 'transform="matrix(1 0 0 1 640 320)"'
 out = ['<g id="metal_panel">', '  <rect x="0" y="20" width="480" height="200" fill="#000000"/>',
-       '  <!-- Twelve rings, fourteen pieces each: four quarter arcs, four pieces down the sides, two across, four of sheen. -->']
+       '  <!-- Twelve rings, nineteen pieces each: four quarter arcs, four pieces down the sides, two across, nine of sheen. -->']
 for r in range(RINGS):
     for i in range(PIECES):
         n = r * PIECES + i
@@ -45,12 +37,19 @@ for r in range(RINGS):
             d, cap = 'M0,-32 L0,32', 'square'
         elif i < 10:
             d, cap = 'M0,-16 L0,16', 'square'
-        elif i < 13:
-            tall, grey = SLIVERS[i - 10]          # the sheen: a lens 64 px tall, filled grey, no outline
-            out.append(f'  <path id="metal_node_{n}" {PARK} d="{lens(tall)}" fill="{grey}" stroke="none"/>')
-            continue
         else:
-            d, cap = 'M0,-32 L0,32', 'round'      # the sheen's hairline
+            # the sheen, keeping its own paint: the stripe (32 px, 1.5 px wide) and the glint (radius 8, 1.3 px) in
+            # each colour, then the rim (radius 8, 0.8 px, dark grey)
+            j = i - 10
+            if j < 4:
+                d, colour, w = 'M0,-16 L0,16', GREYS[j], '1.5'
+            elif j < 8:
+                d, colour, w = arc(), GREYS[j - 4], '1.3'
+            else:
+                d, colour, w = arc(), GREYS[0], '0.8'
+            out.append(f'  <path id="metal_node_{n}" {PARK} d="{d}" fill="none" stroke="{colour}" stroke-width="{w}" '
+                       f'stroke-linecap="round" stroke-linejoin="round"/>')
+            continue
         out.append(f'  <path id="metal_node_{n}" {PARK} d="{d}" fill="none" stroke="#FFFFFF" stroke-width="1.3" '
                    f'stroke-linecap="{cap}" stroke-linejoin="round"/>')
 out.append('  <!-- The palette: white strokes, 0.375 px x 1.284^i wide. -->')
