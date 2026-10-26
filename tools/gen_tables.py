@@ -45,11 +45,11 @@ MODE_HASH = [0.31, -0.83, 0.62, -0.17, 0.94, -0.55, 0.08, -0.71]
 # clips at half scale, which only the loudest settings' first transient reaches.
 LEVEL_DB = 12.0
 OUT_GAIN = 143.0 * 10 ** (LEVEL_DB / 20)
-# BOOST_DB more (in the band's gain), into a soft knee past the half-band: unchanged up to 3/4 of the half-scale
-# ceiling, then bending (a quadratic, slope 1 to 0) onto it at 5/4 of it; above, the ceiling. The voice has no more
-# clean headroom than this: the strike's first peaks reach -9 to -6 dBFS at most settings, and 8 dB here (with the knee
-# from half the ceiling) added 7 to 15 dB of distortion to the sound.
-BOOST_DB = 3.0
+# BOOST_DB more, in the band's gain. That is all the clean headroom there is: the first 50 ms (the strike, BITE and
+# the modes' early ring) peak 11 to 16 dB above the ring's loudness, at -14.7 to -6.2 dBFS without it (every knob
+# setting on a grid, C1 to C7). With 1 dB, 1.5% of those renders touch the half-scale ceiling, by at most 0.8 dB, for a
+# few samples. (A soft knee for 8 dB was tried and was gritty.)
+BOOST_DB = 1.0
 CORE_X = 1.0         # the FM core's output is the reference's x (its carrier at 1/16 full scale; x = car / 2)
 DRIVE_SCALE = 8.0    # into and through the resonator: 8x the reference's level
 LOGQ = 24            # log2 values are Q24
@@ -318,7 +318,7 @@ const('MODE_SHIFT', MODE_SHIFT, 'the mode states carry 2^this x their share of t
 const('LEVEL_DB', int(LEVEL_DB), 'the output level over the brief (dB)')
 const('LP_FIR', q(fir[1]), 'both fixed 20.7 kHz low-passes (Q 0.2) as one 3-tap linear-phase FIR at the voice rate, DC gain 1: x1 + h (x0 + x2 - 2 x1), h = 1/32 + 1/1024, Q31')
 table('HB_IIR', [q(x) for x in HB_IIR], comment='the half-band to the output rate: allpass coefficients, even ones path 0 (even outputs), odd ones path 1, Q31')
-const('L_OUT', log2q(OUT_G * 10 ** (BOOST_DB / 20) / 2), 'log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB, and BOOST_DB / 2 (the knee takes half the signal at a quarter scale); folded into the EQ')
+const('L_OUT', log2q(OUT_G * 10 ** (BOOST_DB / 20)), 'log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB x BOOST_DB; folded into the EQ')
 const('HP_RATIO', q(HP_RATIO), 'keytracked high-pass at 0.45 x the note, Q31')
 const('L_CH_A1', log2q(CHAIN['a1']), 'the chain after the modes, analog prototype in s / (2 pi f0): high-pass, log2 a1')
 const('L_CH_A0', log2q(CHAIN['a0']), 'log2 a0')

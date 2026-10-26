@@ -61,16 +61,22 @@ against the kit's renders):
 
 ## Level
 
-The band after the modes carries the output gain: 12 dB above the brief's level (which was 13 dB under 2op FM), and
-`BOOST_DB` (3 dB) more into a soft knee at the very end: unchanged up to 3/4 of the SDK's half-scale ceiling
-(-6 dBFS), then bent onto the ceiling (a quadratic, reaching it with slope 0 at 5/4 of it). Held notes come out 3 dB
-louder than before the boost.
+The band after the modes carries the output gain: 12 dB above the brief's level (which was 13 dB under 2op FM), plus
+`BOOST_DB` (1 dB). The output is clamped at the SDK's half-scale ceiling (-6 dBFS); there is no limiter.
 
-There is no more clean headroom than that: the strike's first peaks already reach -9 to -6 dBFS at most settings. An
-8 dB boost with the knee from half the ceiling (tried, and heard as gritty) put 7 to 15 dB more energy between the
-partials; at 3 dB with this knee the default sounds and most settings are within about 1 dB of no boost at all, and
-only the loudest (RATIO 1, STRETCH -100, MODES 8, low notes) bends its first transient. For more level, turn the
-track up on the OP-XY. `BOOST_DB` in `tools/gen_tables.py` sets the boost; 0 restores the earlier level exactly.
+That 1 dB is all the clean headroom there is. The loud part of a rings note is its first 50 ms (the strike, BITE and
+the modes' early ring), which peaks 11 to 16 dB above the ring's loudness: over a grid of every knob setting from C1
+to C7, peaks run from -14.7 to -6.2 dBFS before the boost (median -9.5). With 1 dB, 1.5% of those renders touch the
+ceiling, by at most 0.8 dB, for a few samples; with 2 dB, 10%; with 3, 21%. Tried and dropped:
+
+- **A soft knee** (8 dB into it, then 3): it bent the attack and the ring, adding 7 to 15 dB of energy between the
+  partials at 8 dB. Heard as grit.
+- **Phase rotation** (allpasses at fixed or keytracked frequencies, to lower the peaks without changing the spectrum):
+  from -1.7 to +2.7 dB, no gain on balance. The peaks are the attack's, not the waveform's shape.
+- **Less attack** (no BITE, or no STRIKE): 1 to 3 dB less peak for the loudness at some settings, none at others, and
+  it changes the strike.
+
+For more level, turn the track up on the OP-XY.
 
 ## How it was checked
 
@@ -84,7 +90,7 @@ python tools/gen_tables.py             # after changing a constant
 
 - The test compiles the reference into itself twice: as it is, and in double precision with the machine's own
   algorithm (the voice at half rate, the core with op2 stepping four reference samples, the fitted chain, the modes fed
-  in pairs or every sample, the strike's rotation, the half-band and the knee) built on the reference's state and
+  in pairs or every sample, the strike's rotation, the half-band) built on the reference's state and
   set-up.
 - It renders all 27 reference settings through the port and through the double-precision model, and compares the
   FM core, the resonator's drive, the mix after the modes and the output: every stage of every setting at 56 to 68 dB
