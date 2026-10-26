@@ -17,6 +17,7 @@ The port kit keeps the prototype's name: its engine is `rings.c`.
 | [machines/metal](machines/metal) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
 | [tools/gen_tables.py](tools/gen_tables.py) | Generates `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
+| [tools/gen_panel.py](tools/gen_panel.py) | Generates the screen's artwork, `panel.svg.fragment`: the pieces of the twelve rings and the stroke palette `display.cpp` uses |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
 | [tools/probe.c](tools/probe.c) | The float reference with every stage exposed, for levels and debugging |
 
