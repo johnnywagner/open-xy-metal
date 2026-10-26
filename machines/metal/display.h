@@ -3,9 +3,9 @@
 
 namespace metal {
 // Twelve rings (the six modes, mirrored about the middle), each drawn from ten pieces: four quarter arcs, two
-// straight pieces down each side, one across the top and one across the bottom; then five highlights of chrome.
+// straight pieces down each side, one across the top and one across the bottom; then three grey slivers and a hairline of sheen.
 // No paths or text; 16 white strokes of different widths (a piece takes the width that undoes its scale).
-using Frame = opxy::draw::Frame<0, 0, 180, 0, 16>;
+using Frame = opxy::draw::Frame<0, 0, 168, 0, 16>;
 struct DisplayState {
     opxy::u32 initialized, track, previous_event;
     opxy::i32 ages[6];       // Q10 seconds since each mode was struck
