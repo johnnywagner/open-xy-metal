@@ -39,11 +39,11 @@
     {
       "id": "modes",
       "label": "Modes",
-      "default": 0.14269531250000003,
+      "default": 0.2,
       "mapping": {
         "kind": "linear",
         "minimum": 1,
-        "maximum": 8
+        "maximum": 6
       },
       "display": "ratio"
     }
@@ -53,19 +53,19 @@
       "drop": 0,
       "ratio": 0.08855468749999998,
       "stretch": 1,
-      "modes": 0.14269531250000003
+      "modes": 0.2
     },
     "Material": {
       "drop": 0,
       "ratio": 0.08855468749999998,
       "stretch": 0.5,
-      "modes": 0.14269531250000003
+      "modes": 0.2
     },
     "Squeezed": {
       "drop": 0,
       "ratio": 0.08855468749999998,
       "stretch": 0.25,
-      "modes": 0.14269531250000003
+      "modes": 0.2
     },
     "All modes": {
       "drop": 0,
@@ -77,11 +77,11 @@
       "drop": 1,
       "ratio": 0.08855468749999998,
       "stretch": 1,
-      "modes": 0.14269531250000003
+      "modes": 0.2
     }
   },
   "resources": {
-    "voiceBytes": 780,
+    "voiceBytes": 636,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
     "sharedBytes": 0,

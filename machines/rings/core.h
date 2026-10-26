@@ -5,7 +5,7 @@ namespace rings {
 using opxy::i32;
 using opxy::u32;
 
-const unsigned MODES = 8;
+const unsigned MODES = 6;               // the reference's first six (it has eight): CPU
 
 // Only sound state. The SDK owns firmware headers, slot padding and allocation; storage starts zeroed and
 // initialize() clears it again whenever the voice goes to a new owner.

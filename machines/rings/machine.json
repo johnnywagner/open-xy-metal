@@ -2,7 +2,7 @@
   "schema": 1,
   "sdk": "1.1",
   "kind": "synth",
-  "description": "A two-operator FM strike that drops onto each note, ringing eight modes at a material's inharmonic ratios.",
+  "description": "A two-operator FM strike that drops onto each note, ringing six modes at a material's inharmonic ratios.",
   "identity": {
     "engine": 41,
     "page": 91

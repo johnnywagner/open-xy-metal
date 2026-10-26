@@ -28,14 +28,15 @@ The SDK lives beside this repository (`../open-xy`, branch `staging`).
 | 1 | DROP: the FM starts away from the note and drops onto it. One knob drives the start offset (+9 to -31.5 semitones) and the time (37 to 79 ms) | 0..100 |
 | 2 | RATIO: op2 : carrier, 0..1 | 0.00..1.00 |
 | 3 | STRETCH: the material's mode ratios in log2 times 2^(2 x - 1): squeezed to ratio^1/2 at -100, the material at 0, spread to ratio^2 at +100 | -100..+100 |
-| 4 | MODES: 1..8 modes, continuous; the next mode fades in | 1.0..8.0 |
+| 4 | MODES: 1..6 modes, continuous; the next mode fades in | 1.0..6.0 |
 
-All four are the reference's mappings. The modes sit at the material's ratios with the reference's small fixed detune
+All four are the reference's mappings, except that MODES runs over the reference's first six modes, not its eight
+(for CPU: each mode costs about 520 instructions per voice block). The modes sit at the material's ratios with the reference's small fixed detune
 per mode; the first is at 0.54 of the note (0.29 at STRETCH +100). Make-up is the reference's: modes off the FM's
 harmonic lattice get up to 18 dB more (they catch less of it), modes stretched up up to 12 dB more. The modes stop at
 10.9 kHz, fading from 9.8 kHz.
 
-The presets: **Rings** (STRETCH +100), **Material** (0), **Squeezed** (-50), **All modes** (MODES 8) and **Fall**
+The presets: **Rings** (STRETCH +100), **Material** (0), **Squeezed** (-50), **All modes** (MODES 6) and **Fall**
 (DROP 100).
 
 ### Envelope: option B
@@ -141,19 +142,17 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
 Counting instructions per voice block with the Q31 multiply as the one instruction it is on the Blackfin+ (valgrind,
 the most repeatable figure here), at 440 Hz as the SDK times it:
 
-| Setting | rings | before the half-rate voice | 2op FM |
+| Setting | rings | before the half-rate voice (8 modes) | 2op FM |
 | --- | --- | --- | --- |
-| The defaults | 8,450 | 10,850 | 5,600 |
-| MODES 8 | 11,150 | 14,100 | |
-| MODES 8, STRETCH -100 | 11,600 | 14,100 | |
-| RATIO 1 | 8,500 | 11,750 | |
-| A note-on block (new pitch) | 17,650 | 22,500 | |
+| The defaults (MODES 2) | 8,050 | 10,850 | 5,600 |
+| MODES 6 (MODES 8 before) | 10,100 | 14,100 | |
+| RATIO 1 | 8,050 | 11,750 | |
+| A note-on block (new pitch) | 15,800 | 22,500 | |
 
-`sdk.py test` estimates about 24,000 to 27,000 Blackfin instructions per voice block at the heaviest setting, both
-before and after the half-rate voice; 2op FM reads about 14,000. The estimate times the host, where the SDK's
+`sdk.py test` estimates about 22,000 to 27,000 Blackfin instructions per voice block at the heaviest setting, before
+and after the half-rate voice alike; 2op FM reads about 14,000. The estimate times the host, where the SDK's
 portable Q31 multiply takes a dozen instructions and an unpredictable branch, so it is mostly a count of multiplies,
-and the half-rate voice saved loads, stores and arithmetic, not multiplies (about 600 a block at the defaults, 900 at
-MODES 8, either way). It varies by a fifth between runs. No device measurement has been made.
+and the half-rate voice saved loads, stores and arithmetic, not multiplies (about 600 a block at the defaults either way). It varies by a fifth between runs. No device measurement has been made.
 
 ## Voices
 

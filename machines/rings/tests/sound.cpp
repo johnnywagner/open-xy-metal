@@ -127,7 +127,9 @@ static void modal_block_v(rings_t* v, float* x)
     if (v->stretch != v->rkey_stretch || v->note != v->rkey_note) modal_setup(v);   // the reference's own tuning
     const double VR = v->fs / 2;
     float wk[8];
-    for (int k = 0; k < 8; ++k) { const float w = v->modes - (float)k; wk[k] = k == 0 ? 1.f : (w > 1.f ? 1.f : (w < 0.f ? 0.f : w)); }
+    // The machine's six modes over the knob, 1 + 5 x (the reference's 1 + 7 x, v->modes), the last two unfed
+    const float m6 = 1.f + 5.f * (v->modes - 1.f) / 7.f;
+    for (int k = 0; k < 8; ++k) { const float w = m6 - (float)k; wk[k] = k == 0 ? 1.f : (k >= (int)rings::MODES ? 0.f : (w > 1.f ? 1.f : (w < 0.f ? 0.f : w))); }
     const float T = 0.1f * powf(100.f, RDECAY);
     v->rT = 1.f;
     const float mix = WET, dry = 1.f - mix;
