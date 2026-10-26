@@ -1,8 +1,10 @@
 // metal's page: the six modes as rings, mirrored about the middle like the two tines of a tuning fork. STRETCH sets
-// how far apart they stand (their ratios to the note, spread or squeezed), RATIO how wide they are, MODES their shape
-// (round at 1, square at 6; a mode MODES does not feed is drawn thinner). A note strikes them: they start larger or
-// smaller as DROP's pitch starts below or above the note and settle onto it, and each swings, wider and narrower and
-// out and in, at a rate that rises with its mode and dies away with its ring time. Screen work only.
+// how far apart they stand (their ratios to the note, spread or squeezed). RATIO sets how wide they are and which is
+// tallest: the lowest mode at 0, moving out to the highest at 1. MODES sets their shape (round at 1, square at 6) and
+// shrinks the modes it does not feed, drawn thinner too. A note strikes them: they start larger or smaller as DROP's
+// pitch starts below or above the note and settle onto it. Then each swings, wider and narrower and out and in, at a
+// rate that rises with its mode and dies away with its ring time, and the whole array sways from side to side as one.
+// Screen work only.
 #include "display.h"
 #include "display_tables.h"
 
@@ -14,9 +16,14 @@ using namespace opxy::draw;
 
 const i32 MIDDLE_X = 240, MIDDLE_Y = 120;   // the rings' centre line, pixels
 const i32 SWING_DONE = 8192;           // Q10 seconds: a swing older than this is over
-// Each mode's half height at rest, pixels: the sketch's, from the middle outwards.
-const i32 HEIGHT[6] = {20, 27, 57, 80, 42, 58};
+const i32 TALL = 88;                   // the tallest ring's half height at rest, pixels
 const i32 TALLEST = 95;                // half the drawing's height
+const i32 SWAY = 16;                   // the array's sway: pixels either way at the strike
+const i32 SWAY_HZ = 1536;              // Q10: 1.5 Hz
+const i32 SWAY_INV = 427;              // Q10 per second: the sway dies away over 2.4 s, squared
+// The lab (not the OP-XY) can switch the motions off one by one in slot 7: bit 0 the rings' own swings, bit 1 the
+// array's sway. On the device the slot is 0: both on.
+const u32 LAB_NO_SWING = 1, LAB_NO_SWAY = 2;
 const i32 PIECES = 10;                 // nodes per ring
 // The palette: white strokes 0.375 px x 1.284^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale s takes the
 // widest entry within 1.133 of the width it should show divided by s, so every piece shows within 12 % of it.
@@ -124,6 +131,7 @@ inline void display_reset(DisplayState& state) {
     state.initialized = state.track = state.previous_event = 0;
     for (u32 k = 0; k < 6; ++k) { state.ages[k] = SWING_DONE; state.phases[k] = 0; }
     state.drop_age = SWING_DONE;
+    state.sway_phase = 0;
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -140,6 +148,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         if (input.track < 8 && input.note_serial != state.previous_event) {
             for (u32 k = 0; k < 6; ++k) { state.ages[k] = 0; state.phases[k] = 0; }
             state.drop_age = 0;
+            state.sway_phase = 0;
         }
     }
     state.track = input.track;
@@ -157,12 +166,25 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         grow = exp2_q10(clamp(-((((offset * left) >> 10) * 26) >> 10), -unit, unit));
     }
 
+    const u32 lab = static_cast<u32>(input.slots[7]);
+    const bool swings = !still && !(lab & LAB_NO_SWING), sways = !still && !(lab & LAB_NO_SWAY);
+    const i32 step = clamp(elapsed, 0, 205);                            // a late frame moves at most 0.2 s on
+
+    // The sway: the whole array, from side to side, 1.5 Hz, dying away over 2.4 s.
+    i32 sway = 0;
+    if (sways) {
+        state.sway_phase += (static_cast<u32>(SWAY_HZ) * static_cast<u32>(step)) << 12;
+        const i32 left = clamp(unit - ((state.drop_age * SWAY_INV) >> 10), 0, unit);
+        sway = SWAY * ((((left * left) >> 10) * sine(static_cast<i32>(((state.sway_phase >> 20) * 3600) >> 12))) >> 10);
+    }
+
     const i32 st = exp2_q10(fraction(input.parameters[2]) * 2 - unit);   // STRETCH, as on the modes' log2 ratios
-    const i32 a0 = 8 * unit + fraction(input.parameters[1]) * 10;        // RATIO: half width 8 .. 18 pixels
+    const i32 ratio = fraction(input.parameters[1]);
+    const i32 a0 = 8 * unit + ratio * 10;                               // RATIO: half width 8 .. 18 pixels
+    const i32 peak = ratio * 5;                                         // RATIO: the tallest mode, 0 .. 5, Q10
     const i32 square = fraction(input.parameters[3]);                   // MODES: round at 1, square at 6
     const i32 modes5 = square * 5;                                      // Q10: mode k is fed clamp(1 + 5x - k, 0, 1)
     const i32 low = (DISPLAY_L_RM[0] * st) >> 10;
-    const i32 step = clamp(elapsed, 0, 205);                            // a late frame swings at most 0.2 s on
     for (u32 k = 0; k < 6; ++k) {
         const i32 fed = k == 0 ? unit : clamp(modes5 - static_cast<i32>(k - 1) * unit, 0, unit);
         const i32 width = 768 + ((666 * fed) >> 10);                    // stroke 0.75 .. 1.4 px
@@ -171,15 +193,22 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         // The swing: 2.5 Hz for the lowest mode, x 2^(0.35 octaves) above it, at most 9 Hz; it dies away as the
         // mode's ring on screen (DISPLAY_RING) does, squared.
         const i32 hz = clamp((2560 * exp2_up((octaves * 358) >> 10)) >> 10, 0, 9 * unit);
-        if (!still) state.phases[k] += (static_cast<u32>(hz) * static_cast<u32>(step)) << 12;
+        if (swings) state.phases[k] += (static_cast<u32>(hz) * static_cast<u32>(step)) << 12;
         const i32 left = clamp(unit - ((state.ages[k] * DISPLAY_RING_INV[k]) >> 16), 0, unit);
-        const i32 swing = still ? 0 : (((left * left) >> 10) * sine(static_cast<i32>(((state.phases[k] >> 20) * 3600) >> 12))) >> 10;
+        const i32 swing = swings ? (((left * left) >> 10) * sine(static_cast<i32>(((state.phases[k] >> 20) * 3600) >> 12))) >> 10 : 0;
+        // Its height: 1 - (d / 2.5)^2 of the way from 0.22 to 1 of TALL, d its distance in modes from RATIO's
+        // tallest; then 0.3 .. 1 of that as MODES feeds it, and DROP's growth at the strike.
+        const i32 d = ((static_cast<i32>(k) * unit - peak) * 410) >> 10;
+        const i32 bump = clamp(unit - ((d * d) >> 10), 0, unit);
+        const i32 shape = 225 + ((799 * bump) >> 10);
+        const i32 size = (shape * (307 + ((717 * fed) >> 10))) >> 10;
         const i32 a = a0 + (((a0 >> 4) * ((358 * swing) >> 10)) >> 6);  // +/- 35 % wide
-        const i32 b = clamp(HEIGHT[k] * grow, 4 * unit, TALLEST * unit);
+        // never shorter than it is wide: a ring shrinks to a circle (a square at MODES 6), not a dash
+        const i32 b = clamp((((TALL * size) >> 4) * grow) >> 6, a, TALLEST * unit);
         const i32 r = clamp((((a < b ? a : b) >> 4) * (unit - square)) >> 6, 0, 16 * unit);
         const i32 x = out + 3 * swing;                                  // the tines: out and in by 3 px
-        ring(frame, (2 * k) * PIECES, (MIDDLE_X * unit) - x, MIDDLE_Y * unit, a, b, r, width);
-        ring(frame, (2 * k + 1) * PIECES, (MIDDLE_X * unit) + x, MIDDLE_Y * unit, a, b, r, width);
+        ring(frame, (2 * k) * PIECES, MIDDLE_X * unit + sway - x, MIDDLE_Y * unit, a, b, r, width);
+        ring(frame, (2 * k + 1) * PIECES, MIDDLE_X * unit + sway + x, MIDDLE_Y * unit, a, b, r, width);
     }
 }
 } // namespace metal
