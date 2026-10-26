@@ -3,8 +3,9 @@
 // tallest: the lowest mode at 0, moving out to the highest at 1. MODES sets their shape (round at 1, square at 6) and
 // shrinks the modes it does not feed, drawn thinner too. A note strikes them: they start larger or smaller as DROP's
 // pitch starts below or above the note and settle onto it. Then each swings, wider and narrower and out and in, at a
-// rate that rises with its mode and dies away with its ring time, and the whole array sways from side to side as one.
-// Screen work only.
+// rate that rises with its mode and dies away with its ring time. And the rings are a chain, like a slinky or a row
+// of Newton's balls: a strike kicks the ring at one end (the left and right ends in turn), and the push travels along
+// ring by ring, each wiggling on its own spring as it passes, and bounces back off the far end. Screen work only.
 #include "display.h"
 #include "display_tables.h"
 
@@ -18,12 +19,16 @@ const i32 MIDDLE_X = 240, MIDDLE_Y = 120;   // the rings' centre line, pixels
 const i32 SWING_DONE = 8192;           // Q10 seconds: a swing older than this is over
 const i32 TALL = 88;                   // the tallest ring's half height at rest, pixels
 const i32 TALLEST = 95;                // half the drawing's height
-const i32 SWAY = 16;                   // the array's sway: pixels either way at the strike
-const i32 SWAY_HZ = 1536;              // Q10: 1.5 Hz
-const i32 SWAY_INV = 427;              // Q10 per second: the sway dies away over 2.4 s, squared
-// The lab (not the OP-XY) can switch the motions off one by one in slot 7: bit 0 the rings' own swings, bit 1 the
-// array's sway. On the device the slot is 0: both on.
-const u32 LAB_NO_SWING = 1, LAB_NO_SWAY = 2;
+// The browser lab (never the OP-XY, which leaves slots 4 to 7 at 0) tunes the chain through the unused parameter
+// slots, each 0 for the setting below: slot 4 the kick, 5 the pass-along, 6 the wiggle, and slot 7 bits 2 up the
+// ring-out (a 10-bit fraction, plus 1). Slot 7 bit 0 switches the rings' own swings off, bit 1 the chain.
+const u32 LAB_NO_SWING = 1, LAB_NO_CHAIN = 2;
+const i32 KICK = 655;                  // Q10 of the kick's range: 50 + 550 x pixels a second (402)
+const i32 PASS = 512;                  // Q10: the coupling to each neighbour, 30 x 2^(6 x) per s^2 (240)
+const i32 WIGGLE = 512;                // Q10: each ring's own spring, 4 x Hz (2 Hz)
+const i32 RINGOUT = 614;               // Q10: the chain's decay, 0.5 x 12^x s to 1/e (2.2 s)
+const i32 CHAIN_MOST = 40;             // pixels: no ring is pushed further
+const i32 CHAIN_FASTEST = 1000;        // pixels a second: nor moves faster
 const i32 PIECES = 10;                 // nodes per ring
 // The palette: white strokes 0.375 px x 1.284^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale s takes the
 // widest entry within 1.133 of the width it should show divided by s, so every piece shows within 12 % of it.
@@ -131,7 +136,9 @@ inline void display_reset(DisplayState& state) {
     state.initialized = state.track = state.previous_event = 0;
     for (u32 k = 0; k < 6; ++k) { state.ages[k] = SWING_DONE; state.phases[k] = 0; }
     state.drop_age = SWING_DONE;
-    state.sway_phase = 0;
+    for (u32 j = 0; j < 12; ++j) state.at[j] = state.speed[j] = 0;
+    state.carry = 0;
+    state.strikes = 0;
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -139,16 +146,32 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const i32 elapsed = clamp(input.elapsed, 0, SWING_DONE);
     const bool snapshot = !state.initialized || state.track != input.track;
     const bool still = snapshot || input.reduced_motion;
+    const u32 lab = static_cast<u32>(input.slots[7]);
+    // the chain's settings: the lab's, or the ones above
+    const auto lab_slot = [](i32 word, i32 fallback) { return word > 0 ? fraction(word) : fallback; };
+    const i32 kick = (50 + ((550 * lab_slot(input.slots[4], KICK)) >> 10)) * unit;
+    const i32 pass = (30 * exp2_up(6 * lab_slot(input.slots[5], PASS))) >> 10;        // per s^2
+    const i32 wiggle = 4 * lab_slot(input.slots[6], WIGGLE);                          // Hz, Q10
+    const i32 own = ((((wiggle * wiggle) >> 10) * 40426) >> 20);                      // (2 pi f)^2, per s^2
+    const i32 ringout = (lab >> 2) & 2047 ? static_cast<i32>(((lab >> 2) & 2047) - 1) : RINGOUT;
+    const i32 fall = (3671 * ringout) >> 10;                                         // x log2 12, Q10
+    const i32 whole = fall > unit ? (fall + unit - 1) >> 10 : 1;
+    const i32 damp = exp2_q10((whole << 10) - fall - unit) >> (whole - 1);            // 4 x 12^-x per s, Q8
     if (still) {
         for (u32 k = 0; k < 6; ++k) state.ages[k] = SWING_DONE;
         state.drop_age = SWING_DONE;
+        for (u32 j = 0; j < 12; ++j) state.at[j] = state.speed[j] = 0;
+        state.carry = 0;
     } else {
         for (u32 k = 0; k < 6; ++k) state.ages[k] = clamp(state.ages[k] + elapsed, 0, SWING_DONE);
         state.drop_age = clamp(state.drop_age + elapsed, 0, SWING_DONE);
         if (input.track < 8 && input.note_serial != state.previous_event) {
             for (u32 k = 0; k < 6; ++k) { state.ages[k] = 0; state.phases[k] = 0; }
             state.drop_age = 0;
-            state.sway_phase = 0;
+            if (!(lab & LAB_NO_CHAIN)) {
+                if (++state.strikes & 1) state.speed[0] = clamp(state.speed[0] + kick, -CHAIN_FASTEST * unit, CHAIN_FASTEST * unit);
+                else state.speed[11] = clamp(state.speed[11] - kick, -CHAIN_FASTEST * unit, CHAIN_FASTEST * unit);
+            }
         }
     }
     state.track = input.track;
@@ -166,16 +189,27 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         grow = exp2_q10(clamp(-((((offset * left) >> 10) * 26) >> 10), -unit, unit));
     }
 
-    const u32 lab = static_cast<u32>(input.slots[7]);
-    const bool swings = !still && !(lab & LAB_NO_SWING), sways = !still && !(lab & LAB_NO_SWAY);
+    const bool swings = !still && !(lab & LAB_NO_SWING);
     const i32 step = clamp(elapsed, 0, 205);                            // a late frame moves at most 0.2 s on
 
-    // The sway: the whole array, from side to side, 1.5 Hz, dying away over 2.4 s.
-    i32 sway = 0;
-    if (sways) {
-        state.sway_phase += (static_cast<u32>(SWAY_HZ) * static_cast<u32>(step)) << 12;
-        const i32 left = clamp(unit - ((state.drop_age * SWAY_INV) >> 10), 0, unit);
-        sway = SWAY * ((((left * left) >> 10) * sine(static_cast<i32>(((state.sway_phase >> 20) * 3600) >> 12))) >> 10);
+    // The chain, stepped 1/128 s at a time: each ring is pulled back to its place by its own spring and towards its
+    // neighbours by the coupling (the ends by walls, so the push bounces back), and slowed by the ring-out.
+    if (!still) {
+        state.carry += step;
+        const i32 steps = state.carry >> 3;
+        state.carry &= 7;
+        for (i32 n = 0; n < steps; ++n) {
+            i32 push[12];
+            for (u32 j = 0; j < 12; ++j) {
+                const i32 before = j ? state.at[j - 1] : 0, after = j < 11 ? state.at[j + 1] : 0;
+                const i32 pull = (before >> 2) - (state.at[j] >> 1) + (after >> 2);  // a quarter of the Laplacian
+                push[j] = 4 * pass * pull - own * state.at[j] - ((damp * state.speed[j]) >> 8);
+            }
+            for (u32 j = 0; j < 12; ++j) {
+                state.speed[j] = clamp(state.speed[j] + ((push[j] + 64) >> 7), -CHAIN_FASTEST * unit, CHAIN_FASTEST * unit);
+                state.at[j] = clamp(state.at[j] + ((state.speed[j] + 64) >> 7), -CHAIN_MOST * unit, CHAIN_MOST * unit);
+            }
+        }
     }
 
     const i32 st = exp2_q10(fraction(input.parameters[2]) * 2 - unit);   // STRETCH, as on the modes' log2 ratios
@@ -207,8 +241,10 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         const i32 b = clamp((((TALL * size) >> 4) * grow) >> 6, a, TALLEST * unit);
         const i32 r = clamp((((a < b ? a : b) >> 4) * (unit - square)) >> 6, 0, 16 * unit);
         const i32 x = out + 3 * swing;                                  // the tines: out and in by 3 px
-        ring(frame, (2 * k) * PIECES, MIDDLE_X * unit + sway - x, MIDDLE_Y * unit, a, b, r, width);
-        ring(frame, (2 * k + 1) * PIECES, MIDDLE_X * unit + sway + x, MIDDLE_Y * unit, a, b, r, width);
+        // the chain runs left to right: the left rings from mode 5 in to mode 0, then the right from 0 out to 5
+        const i32 left_at = state.at[5 - k], right_at = state.at[6 + k];
+        ring(frame, (2 * k) * PIECES, MIDDLE_X * unit - x + left_at, MIDDLE_Y * unit, a, b, r, width);
+        ring(frame, (2 * k + 1) * PIECES, MIDDLE_X * unit + x + right_at, MIDDLE_Y * unit, a, b, r, width);
     }
 }
 } // namespace metal
