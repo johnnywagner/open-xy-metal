@@ -9,9 +9,10 @@
 // left and right ends in turn) and the push travels along ring by ring, each wiggling on its own spring as it
 // passes, bouncing back off the far end. And each ring pulses, wider and narrower and out and in, at a rate that
 // rises with its mode and dies away with its ring time. And each ring can bob up and down on its own, each at its own
-// rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can make the rings chrome
-// across a knob: highlights inside each, a bright stripe down its left, a glint in its top corner, a dim rim light at
-// its bottom right and a reflection down its right, that slide as the ring moves. Screen work only (screen v8).
+// rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can give the rings a
+// metal sheen across a knob: inside each, grey slivers of reflection (dark, mid and light, the OP-XY's own greys) and
+// a white hairline, nested towards the light at the left, sliding against the ring's motion, the nearer the light the
+// further. Screen work only (screen v9).
 #include "display.h"
 #include "display_tables.h"
 
@@ -53,7 +54,7 @@ const i32 BOB_FADE_INV = 410;          // Q10 per second: a note's bob dies away
 const i32 BOB_RATE[12] = {1024, 851, 1198, 932, 1116, 788, 1260, 973, 1075, 891, 1157, 819};
 const i32 CHAIN_MOST = 40;             // pixels: no ring is pushed further
 const i32 CHAIN_FASTEST = 1000;        // pixels a second: nor moves faster
-const i32 PIECES = 15;                 // nodes per ring: the ring's 10 pieces, then 5 highlights of chrome
+const i32 PIECES = 14;                 // nodes per ring: the ring's 10 pieces, then 3 slivers and a hairline of sheen
 // The palette: white strokes 0.375 px x 1.284^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale s takes the
 // widest entry within 1.133 of the width it should show divided by s, so every piece shows within 12 % of it.
 const i32 WIDTHS[16] = {384, 493, 633, 813, 1044, 1340, 1721, 2209, 2837, 3643, 4677, 6005, 7711, 9901, 12713, 16323};
@@ -208,69 +209,46 @@ inline u32 root(u32 v) {
     return r;
 }
 
-// Chrome on one ring (centre cx, cy; half width a, half height b, corner radius r, all Q10 pixels), as much as
-// `shine` (Q10, 0 .. 1): its highlights come in as it rises. `slide` (Q10 pixels) moves them against the ring's
-// motion, so the light seems to stay put while the ring moves under it. Its five pieces, in order: the stripe, a
-// thinner stripe beside it, the glint, the rim light and the reflection.
+// The sheen's slivers, darkest first (each drawn over the last): how tall it is for how wide (the artwork's lens is
+// 64 px tall, 64 / this wide), where across (Q10 of the half width, + right), how high (Q10 of the half height, + down),
+// how much of the inside's height it may take (Q10), how far it slides (Q10 of the slide), and when it comes in (Q10 of
+// the knob). The hairline then runs down the middle of the light one.
+const i32 SLIVER[3][6] = {
+    {6, 123, 0, 952, 307, 0},          // dark grey: the body of the reflection, a little right of centre
+    {9, -225, -82, 768, 614, 205},     // mid grey: left of it, a little higher
+    {16, -430, -154, 614, 1024, 410},  // light grey: nearest the light, highest, moving most
+};
+
+// The sheen on one ring (centre cx, cy; half width a, half height b; Q10 pixels), as much as `shine` (Q10, 0 .. 1):
+// each sliver grows in over half the knob after its turn, as tall as the ring's inside and its width allow. `slide`
+// (Q10 pixels) moves them against the ring's motion. Pieces: the three slivers (their grey and fill are the
+// artwork's), then the hairline.
 template <class F>
-void chrome(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 shine, i32 slide) {
-    if (shine <= 0) { for (u32 i = 0; i < 5; ++i) hide(frame, first + i); return; }
-    const auto grown = [&](i32 from) { return clamp(((shine - from) * 2) , 0, unit); };   // in over half the knob
+void chrome(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 shine, i32 slide) {
+    const i32 inside = 2 * (b - 2 * unit);                            // the inside's height
+    const i32 room = a - 3 * unit / 2;                                // half its width, clear of the outline
     slide = clamp(slide, -(a >> 2), a >> 2);
-    const i32 straight_part = b - ((r * 614) >> 10);                  // the side, less 0.6 of the corner
-    // the stripe: down the left, 0.45 of the way out, 1.6 x the side long, 0.9 .. 2.2 px
-    {
-        const i32 g = clamp((shine * 3) >> 1, 0, unit);
-        const i32 length = ((((2 * straight_part) >> 4) * 819 >> 6) >> 4) * g >> 6;
-        if (length < 2 * unit) hide(frame, first);
-        else {
-            const i32 s = clamp(length >> 6, SMALLEST, 2 * unit);
-            place(frame, first, cx - ((a * 461) >> 10) + slide, cy - ((b * 82) >> 10), s, stroke_for(s, 922 + ((1331 * g) >> 10)), stroke);
-        }
+    i32 light_x = 0, light_y = 0, light_h = 0;
+    for (u32 i = 0; i < 3; ++i) {
+        const i32* s = SLIVER[i];
+        const i32 grown = clamp((shine - s[5]) * 2, 0, unit);
+        const i32 x = ((a >> 4) * s[1] >> 6) + ((slide >> 4) * s[4] >> 6);
+        const i32 y = (b >> 4) * s[2] >> 6;
+        const i32 side = room - (x < 0 ? -x : x);                     // half width it may take
+        // its height: the inside's share, no wider than the room allows (width = height / s[0]), at most 128 px
+        i32 h = (inside >> 4) * s[3] >> 6;
+        if (h > 2 * s[0] * side) h = 2 * s[0] * side;
+        h = ((h >> 4) * grown) >> 6;
+        const i32 scale = h >> 6;                                     // the artwork's lens is 64 px tall
+        if (side <= 0 || scale < 40) { hide(frame, first + i); continue; }
+        place(frame, first + i, cx + x, cy + y, clamp(scale, 1, 2 * unit), 0, keep);
+        if (i == 2) { light_x = x; light_y = y; light_h = h; }
     }
-    // a thinner stripe beside it, higher and shorter: 0.6 px
-    {
-        const i32 g = grown(256);
-        const i32 length = ((((2 * straight_part) >> 4) * 451 >> 6) >> 4) * g >> 6;
-        if (length < 2 * unit) hide(frame, first + 1);
-        else {
-            const i32 s = clamp(length >> 6, SMALLEST, 2 * unit);
-            place(frame, first + 1, cx - ((a * 205) >> 10) + ((slide * 614) >> 10), cy - ((b * 205) >> 10), s, stroke_for(s, 614), stroke);
-        }
-    }
-    // the glint: a quarter round inside the top-left corner, 1.2 .. 2 px
-    {
-        const i32 g = grown(154);
-        const i32 radius = clamp((r * 635) >> 10, 5 * unit / 2, 16 * unit);
-        const i32 in = radius + (radius >> 2) + 3 * unit / 2;
-        const i32 s = (((radius >> 3) >> 4) * g) >> 6;
-        if (s < SMALLEST || in > a || in > b) hide(frame, first + 2);
-        else {
-            place(frame, first + 2, cx - a + in + (slide >> 1), cy - b + in, s, stroke_for(s, 1229 + ((819 * g) >> 10)), stroke);
-        }
-    }
-    // the rim light: a thin quarter round inside the bottom-right corner, 0.55 px
-    {
-        const i32 g = grown(461);
-        const i32 radius = clamp((r * 717) >> 10, 3 * unit, 16 * unit);
-        const i32 in = radius + (radius >> 2) + 3 * unit / 2;
-        const i32 s = (((radius >> 3) >> 4) * g) >> 6;
-        if (s < SMALLEST || in > a || in > b) hide(frame, first + 3);
-        else {
-            place(frame, first + 3, cx + a - in - (slide >> 1), cy + b - in, s, stroke_for(s, 563), stroke);
-            turn(frame, first + 3, rotation(1800));
-        }
-    }
-    // the reflection: a short thin stripe down the right, low, 0.5 px
-    {
-        const i32 g = grown(614);
-        const i32 length = (((straight_part >> 4) * 922 >> 6) >> 4) * g >> 6;
-        if (length < 2 * unit) hide(frame, first + 4);
-        else {
-            const i32 s = clamp(length >> 5, SMALLEST, 2 * unit);
-            place(frame, first + 4, cx + ((a * 563) >> 10) - ((slide * 307) >> 10), cy + ((b * 256) >> 10), s, stroke_for(s, 512), stroke);
-        }
-    }
+    // the hairline: white, 0.45 px, down 0.8 of the light sliver
+    const i32 length = (light_h >> 4) * 819 >> 6;
+    if (length < 3 * unit) { hide(frame, first + 3); return; }
+    const i32 scale = clamp(length >> 6, SMALLEST, 2 * unit);
+    place(frame, first + 3, cx + light_x, cy + light_y, scale, stroke_for(scale, 461), stroke);
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -369,7 +347,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         spread += bend > 0 ? ((cube - spread) * bend) >> 10 : ((ease - spread) * -bend) >> 10;
     }
     const i32 st = exp2_wide(((2 * spread - unit) * 2 * lab_setting(input, SPACE_DEPTH_SET, SPACE_DEPTH)) >> 10);
-    const i32 shine = driven(input, CHROME);                            // Q10: how much chrome, 0 .. 1
+    const i32 shine = driven(input, CHROME);                            // Q10: how much sheen, 0 .. 1
     const i32 a0 = 8 * unit + driven(input, WIDTH) * 10;                // half width 8 .. 18 pixels
     const i32 peak = driven(input, TALLEST_RING) * 5;                   // the tallest mode, 0 .. 5, Q10
     const i32 square = driven(input, SHAPE);                            // round at 0, square at 1
@@ -406,8 +384,8 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         ring(frame, (2 * k) * PIECES, lx, ly, a, b, r, width);
         ring(frame, (2 * k + 1) * PIECES, rx, ry, a, b, r, width);
         // the highlights slide against the ring's motion: its push along the chain, and its pulse
-        chrome(frame, (2 * k) * PIECES + 10, lx, ly, a, b, r, shine, -(state.speed[5 - k] >> 7) - 3 * sway);
-        chrome(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, r, shine, -(state.speed[6 + k] >> 7) + 3 * sway);
+        chrome(frame, (2 * k) * PIECES + 10, lx, ly, a, b, shine, -(state.speed[5 - k] >> 7) - 3 * sway);
+        chrome(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, shine, -(state.speed[6 + k] >> 7) + 3 * sway);
     }
 }
 } // namespace metal
