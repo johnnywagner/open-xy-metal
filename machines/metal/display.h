@@ -6,7 +6,7 @@ namespace metal {
 // (ten: four quarter arcs, two straight pieces down each side, one across the top and one across the bottom). Palette:
 // twelve white strokes of different widths (a piece takes the width that undoes its scale), then four fill colours.
 // No paths or text.
-using Frame = opxy::draw::Frame<0, 0, 204, 0, 16>;
+using Frame = opxy::draw::Frame<0, 0, 240, 0, 16>;
 struct DisplayState {
     opxy::u32 initialized, track, previous_event;
     opxy::i32 ages[6];       // Q10 seconds since each mode was struck
@@ -17,6 +17,5 @@ struct DisplayState {
     opxy::i32 carry;         // Q10 seconds not yet stepped (the chain steps 1/128 s at a time)
     opxy::u32 strikes;       // notes so far: odd ones kick the chain from the left, even from the right
     opxy::u32 bob[12];       // each ring's bob, a full cycle per 2^32
-    opxy::u32 frames;        // frames drawn, for the fill's fade
 };
 }

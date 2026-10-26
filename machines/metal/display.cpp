@@ -10,9 +10,9 @@
 // passes, bouncing back off the far end. And each ring pulses, wider and narrower and out and in, at a rate that
 // rises with its mode and dies away with its ring time. And each ring can bob up and down on its own, each at its own
 // rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can fill the rings across
-// a knob, from black to white: in steps through the OP-XY's greys, or fading, the screen alternating each ring between
-// the two nearest greys frame by frame in the share between them (it draws flat colours only, with no transparency).
-// Screen work only (screen v13).
+// a knob: in steps through the OP-XY's greys to white, or in white growing smoothly, rising from the ring's foot or
+// swelling from its centre (the screen draws flat colours only, but moves and scales them smoothly). Screen work only
+// (screen v14).
 #include "display.h"
 #include "display_tables.h"
 
@@ -33,7 +33,7 @@ const i32 TALLEST = 95;                // half the drawing's height
 //     or 5 for none (the knob's default value; the whole amount for the chain, pulse and bob; no chrome); bit 3
 //     inverts the knob;
 //   bits 120-121: the bob, 0 as here, 1 all the time, 2 on notes;
-//   bits 122-123: the fill, 0 as here, 1 in steps, 2 fading.
+//   bits 122-123: the fill, 0 as here, 1 in steps, 2 rising, 3 swelling.
 enum Setting { KICK_SET, PASS_SET, WIGGLE_SET, RINGOUT_SET, PULSE_SET, JOLT_SET, BOB_DEPTH_SET, BOB_SPEED_SET,
                SPACE_DEPTH_SET, SPACE_CURVE_SET };
 enum Drive { SPACING, WIDTH, TALLEST_RING, SHAPE, STANDING, STRIKE_SIZE, CHAIN_AMOUNT, PULSE_AMOUNT, BOB, FILL };
@@ -55,15 +55,14 @@ const i32 BOB_FADE_INV = 410;          // Q10 per second: a note's bob dies away
 const i32 BOB_RATE[12] = {1024, 851, 1198, 932, 1116, 788, 1260, 973, 1075, 891, 1157, 819};
 const i32 CHAIN_MOST = 40;             // pixels: no ring is pushed further
 const i32 CHAIN_FASTEST = 1000;        // pixels a second: nor moves faster
-const i32 PIECES = 17;                 // nodes per ring: the fill's 7 capsules, then the outline's 10 (gen_panel.py)
+const i32 PIECES = 20;                 // nodes per ring: the fill's 10 capsules, then the outline's 10 (gen_panel.py)
 // The palette's first twelve: white strokes 0.375 px x 1.405^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale
 // s takes the widest within 1.133 of the width it should show divided by s, so every piece shows within 19 % of it.
 const i32 WIDTHS[12] = {384, 540, 758, 1065, 1496, 2102, 2954, 4150, 5831, 8193, 11511, 16172};
 // Palette entries 12 to 15: the fill's colours, the OP-XY's dark, mid and light greys, then white.
 const u32 FILL_SHADE = 12;
-const bool FILL_FADES = false;         // the fill steps through the greys; fading alternates between them
-// Each ring's turn in the fade's alternation, so they do not flicker together.
-const u32 FADE_TURN[12] = {0, 7, 3, 10, 5, 1, 8, 4, 11, 2, 9, 6};
+enum FillMode { FILL_STEPS = 1, FILL_RISES = 2, FILL_SWELLS = 3 };
+const u32 FILL_MODE = FILL_STEPS;       // how the fill shows its knob
 const i32 SMALLEST = 90;               // Q10: below this scale a piece would need a stroke wider than the palette's
 
 // Q10 fraction of a Q31 knob word.
@@ -172,7 +171,6 @@ inline void display_reset(DisplayState& state) {
     state.carry = 0;
     state.strikes = 0;
     for (u32 j = 0; j < 12; ++j) state.bob[j] = static_cast<u32>(j) * 0x6ED9EBA1u;   // each ring somewhere else
-    state.frames = 0;
 }
 
 // `width` bits of the lab's stream from bit `at` (slots 4 to 7, 31 bits each).
@@ -217,22 +215,43 @@ inline u32 root(u32 v) {
     return r;
 }
 
-// The fill in one ring (centre cx, cy; half width a, half height b; Q10 pixels): palette colour `shade`, or none
-// when `shade` is 0. The artwork's capsules can only be scaled whole, so the fill is copies of one capsule as wide as
-// the ring's inside, overlapped end to end to make its height exactly: two discs, two capsules twice as tall as wide,
-// or three four times as tall (nodes 0-1, 2-3 and 4-6). Round-ended, so square rings keep dark corners.
+// A filled capsule: centre (cx, cy), width w, height h (Q10 pixels), palette colour `shade` (0: none). The artwork can
+// only be scaled whole, so it holds ten capsules (nodes 0-9), each FILL_TALL[i] times as tall as wide, and the fill is
+// two of them as wide as w, end to end: two whose straight sides overlap make one exact capsule, from the taller one's
+// height to the two's together less one width, and each pair's reach meets the next pair's (FILL_TALL[i + 2] =
+// FILL_TALL[i] + FILL_TALL[i + 1] - 1), so pairs make every height from 1.5 to 23.25 widths. Below 1.5 widths it is the
+// nearest one alone (a little shorter or narrower than asked); beyond 23.25 the last pair, narrower. Wider than it is
+// tall, the same turned a quarter.
+const i32 FILL_TALL[10] = {1024, 1280, 1536, 1792, 2304, 3072, 4352, 6400, 9728, 15104};   // Q10
+const i32 FILL_WIDE_INV[10] = {1638, 1638, 1638, 1638, 1638, 1638, 1638, 2048, 3277, 4855}; // 2^16 / its width, px
 template <class F>
-void fill_ring(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, u32 shade) {
-    const i32 w = 2 * a - unit, h = 2 * b - unit;                     // inside the outline's middle
-    const i32 tall = h <= 2 * w ? 1 : h <= 4 * w ? 2 : 4;            // the capsule used, by its height for its width
-    const u32 from = tall == 1 ? 0 : tall == 2 ? 2 : 4, count = tall == 4 ? 3 : 2;
-    const i32 reach = clamp((h - tall * w) >> 1, 0, h);               // how far each end copy sits from the centre
-    const i32 scale = (w * 3277) >> 16;                               // the capsules are 20 px wide
-    for (u32 node = 0; node < 7; ++node) {
-        if (!shade || w < unit || scale < 20 || node < from || node >= from + count) { hide(frame, first + node); continue; }
-        const u32 copy = node - from;                                 // 0 above, 1 below, 2 in the middle
-        const i32 y = copy == 0 ? cy - reach : copy == 1 ? cy + reach : cy;
-        place(frame, first + node, cx, y, clamp(scale, 1, 2 * unit), shade, fill_and_stroke);
+void capsule(F& frame, u32 first, i32 cx, i32 cy, i32 w, i32 h, u32 shade) {
+    for (u32 node = 0; node < 10; ++node) hide(frame, first + node);
+    const bool across = h < w;                                        // lying down: turned a quarter
+    i32 wide = across ? h : w, tall = across ? w : h;
+    if (!shade || wide < unit) return;
+    i32 one = 0, two = -1;                                            // the capsules used, the taller first
+    if (tall < (1152 * wide) >> 10) one = 0;                          // to 1.125: a disc
+    else if (tall < (1280 * wide) >> 10) { one = 1; wide = (tall * 819) >> 10; }       // narrower
+    else if (tall < (1408 * wide) >> 10) one = 1;                     // to 1.375: shorter
+    else if (tall < (1536 * wide) >> 10) { one = 2; wide = (tall * 683) >> 10; }       // narrower
+    else {
+        if (tall > (23808 * (wide >> 4)) >> 6) wide = (tall * 44) >> 10;   // beyond 23.25: narrower
+        one = 2;
+        while (one < 9 && ((FILL_TALL[one + 1] * (wide >> 4)) >> 6) <= tall) ++one;
+        two = one - 1;
+    }
+    const i32 c = across ? cx : cy;
+    for (u32 n = 0; n < 2; ++n) {
+        const i32 i = n ? two : one;
+        if (i < 0) break;
+        const i32 length = (FILL_TALL[i] * (wide >> 4)) >> 6;         // this capsule's own height
+        // alone it is centred; of a pair the taller one meets the top (or left) end, the other the bottom
+        const i32 at = two < 0 ? c : n == 0 ? c - ((tall - length) >> 1) : c + ((tall - length) >> 1);
+        const i32 s = clamp((wide * FILL_WIDE_INV[i]) >> 16, 1, 2 * unit);
+        const u32 node = first + static_cast<u32>(i);
+        place(frame, node, across ? at : cx, across ? cy : at, s, shade, fill_and_stroke);
+        if (across) turn(frame, node, rotation(900));
     }
 }
 
@@ -332,14 +351,11 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         spread += bend > 0 ? ((cube - spread) * bend) >> 10 : ((ease - spread) * -bend) >> 10;
     }
     const i32 st = exp2_wide(((2 * spread - unit) * 2 * lab_setting(input, SPACE_DEPTH_SET, SPACE_DEPTH)) >> 10);
-    // FILL: none below a tenth of its knob; then in steps, a quarter of the rest each (dark, mid, light grey, white),
-    // or fading: 0 .. 4 colours, each ring showing the two nearest in turn, frame by frame, in their share
+    // FILL: in steps, none below a tenth of its knob, then a quarter of the rest each for the dark, mid and light grey
+    // and white; or white, rising from the ring's foot or swelling from its centre with the knob
     const i32 shine = driven(input, FILL);
-    const u32 fill_mode = lab_bits(input, 122, 2);
-    const bool fades = fill_mode ? fill_mode == 2 : FILL_FADES;
-    ++state.frames;
+    const u32 fill_mode = lab_bits(input, 122, 2) ? lab_bits(input, 122, 2) : FILL_MODE;
     const i32 steps = shine < 102 ? 0 : clamp(1 + (((shine - 102) * 4551) >> 20), 1, 4);   // 0 none, 1 .. 4
-    const i32 fade = clamp(shine, 0, unit) * 4;                         // Q10 colours: 0 .. 4
     const i32 a0 = 8 * unit + driven(input, WIDTH) * 10;                // half width 8 .. 18 pixels
     const i32 peak = driven(input, TALLEST_RING) * 5;                   // the tallest mode, 0 .. 5, Q10
     const i32 square = driven(input, SHAPE);                            // round at 0, square at 1
@@ -373,20 +389,26 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         const i32 left_at = state.at[5 - k], right_at = state.at[6 + k];
         const i32 lx = MIDDLE_X * unit - x + left_at, rx = MIDDLE_X * unit + x + right_at;
         const i32 ly = MIDDLE_Y * unit + bobbed[5 - k], ry = MIDDLE_Y * unit + bobbed[6 + k];
-        ring(frame, (2 * k) * PIECES + 7, lx, ly, a, b, r, width);
-        ring(frame, (2 * k + 1) * PIECES + 7, rx, ry, a, b, r, width);
+        ring(frame, (2 * k) * PIECES + 10, lx, ly, a, b, r, width);
+        ring(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, r, width);
         // the highlights slide against the ring's motion: its push along the chain, and its pulse
+        // the ring's inside, to the middle of its outline
+        const i32 w = 2 * a - unit, h = 2 * b - unit, full = clamp(shine, 0, unit);
         for (u32 side = 0; side < 2; ++side) {
-            const u32 j = side ? 6 + k : 5 - k;
-            i32 colour = steps;
-            if (fades) {
-                // the frames in each 16 that show the brighter colour are its share of 16, spread out, each ring on its turn
-                static const u32 ORDER[16] = {0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15};   // spread evenly
-                const u32 slot = ORDER[(state.frames + FADE_TURN[j]) & 15];
-                colour = (fade >> 10) + (static_cast<u32>((fade & (unit - 1)) >> 6) > slot ? 1 : 0);
+            const u32 first = (2 * k + side) * PIECES;
+            const i32 cx = side ? rx : lx, cy = side ? ry : ly;
+            if (fill_mode == FILL_RISES) {
+                // up from the foot, as wide as fits the ring's corners: a capsule as tall as the level, its round
+                // ends tangent to the corners' (a disc in a round ring, the whole width in a square one)
+                const i32 level = ((h >> 4) * full) >> 6;
+                const i32 across = clamp(w - 2 * r + level, level < w ? level : w, w);
+                capsule(frame, first, cx, cy + ((h - level) >> 1), across, level, full ? FILL_SHADE + 3 : 0);
+            } else if (fill_mode == FILL_SWELLS) {
+                // in proportion, the ring's own shape at every size
+                capsule(frame, first, cx, cy, ((w >> 4) * full) >> 6, ((h >> 4) * full) >> 6, full ? FILL_SHADE + 3 : 0);
+            } else {
+                capsule(frame, first, cx, cy, w, h, steps ? FILL_SHADE + static_cast<u32>(steps - 1) : 0);
             }
-            fill_ring(frame, (2 * k + side) * PIECES, side ? rx : lx, side ? ry : ly, a, b,
-                      colour ? FILL_SHADE + static_cast<u32>(colour - 1) : 0);
         }
     }
 }
