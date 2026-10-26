@@ -4,15 +4,15 @@ repository root:
 
     python3 tools/gen_panel.py
 
-Twelve rings of twenty pieces each (node 20 r + i): four quarter arcs of radius 8, from the left round to the top
+Twelve rings of fifteen pieces each (node 15 r + i): four quarter arcs of radius 8, from the left round to the top
 (display.cpp turns them for the other corners), then four vertical pieces 64 px long and two 32 px long that
-display.cpp turns across, then ten 32 px streaks for the texture. All start parked off screen. The palette is 16 white strokes, 0.375 px x 1.284^i wide:
+display.cpp turns across; then the chrome: two 64 px stripes, two quarter arcs and a 32 px stripe. All start parked off screen. The palette is 16 white strokes, 0.375 px x 1.284^i wide:
 display.cpp gives each piece the one that undoes its scale (WIDTHS there is this table in Q10).
 """
 import math
 from pathlib import Path
 
-RINGS, PIECES, ARC = 12, 20, 8
+RINGS, PIECES, ARC = 12, 15, 8
 WIDTHS = [0.375 * 1.284 ** i for i in range(16)]
 
 def num(v):
@@ -25,7 +25,7 @@ def arc():
 
 PARK = 'transform="matrix(1 0 0 1 640 320)"'
 out = ['<g id="metal_panel">', '  <rect x="0" y="20" width="480" height="200" fill="#000000"/>',
-       '  <!-- Twelve rings, twenty pieces each: four quarter arcs, four pieces down the sides, two across, ten streaks. -->']
+       '  <!-- Twelve rings, fifteen pieces each: four quarter arcs, four pieces down the sides, two across, five of chrome. -->']
 for r in range(RINGS):
     for i in range(PIECES):
         n = r * PIECES + i
@@ -35,8 +35,12 @@ for r in range(RINGS):
             d, cap = 'M0,-32 L0,32', 'square'
         elif i < 10:
             d, cap = 'M0,-16 L0,16', 'square'
+        elif i in (10, 11):
+            d, cap = 'M0,-32 L0,32', 'round'      # chrome: the stripes
+        elif i in (12, 13):
+            d, cap = arc(), 'round'               # chrome: the glint and the rim light
         else:
-            d, cap = 'M0,-16 L0,16', 'round'      # the texture's streaks
+            d, cap = 'M0,-16 L0,16', 'round'      # chrome: the reflection
         out.append(f'  <path id="metal_node_{n}" {PARK} d="{d}" fill="none" stroke="#FFFFFF" stroke-width="1.3" '
                    f'stroke-linecap="{cap}" stroke-linejoin="round"/>')
 out.append('  <!-- The palette: white strokes, 0.375 px x 1.284^i wide. -->')
