@@ -426,20 +426,6 @@ void clear(Voice& voice) {
     for (unsigned i = 0; i < sizeof(Voice) / sizeof(u32); ++i) words[i] = 0;
 }
 
-// The boost's soft knee, on a quarter of the signal (z, the half-scale ceiling at 2^28): unchanged up to 3/4 of the
-// ceiling (k), then z - (z - k)^2 / (4 w) (w the quarter of the ceiling left) up to k + 2 w, where it meets the ceiling
-// with slope 0; the ceiling above. Returns the full-scale output. The voice's output stage runs at half the boosted
-// level (z = half its output): VOICE_TOP keeps it where the knee has reached the ceiling, with room for the half-band's
-// overshoot.
-const i32 VOICE_TOP = 7 << 27;
-inline i32 knee(i32 z) {
-    const i32 k = 3 << 26, a = absolute(z);
-    if (a <= k) return 4 * z;
-    const i32 d = a - k;
-    const i32 y = d >= 2 << 26 ? HALF_SCALE : clamp(4 * (a - mul(d, d) * 8), 0, HALF_SCALE);
-    return z < 0 ? -y : y;
-}
-
 // Taps for the machine's own tests: each stage of the last block (the voice-rate stages at 32 samples). Null in the
 // device and preview builds.
 struct Taps { i32 core[32], drive[32], mix[32], voice[32], out[64]; };
@@ -532,13 +518,13 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
             const i32 e = mul27(hg - g1 + hg2, k0) + mul27(hg - hg2, k1)
                         + static_cast<i32>(2u * static_cast<u32>(e1) - static_cast<u32>(e2)) - mul29(e1, k2) + mul(e2, k3);
             g2 = g1; g1 = g; e2 = e1; e1 = e;
-            const i32 s0 = clamp(e, -VOICE_TOP, VOICE_TOP) >> 1;   // e: half the boosted output (the knee's 3 / 4)
+            const i32 s0 = clamp(e, -(1 << 30), 1 << 30) >> 1;
             if (taps) taps->voice[n] = s0 * 2;
             const i32 t0 = mul(HB_IIR[0], s0 - a0) + h0, u0 = mul(HB_IIR[2], t0 - b0) + a0;
             const i32 t1 = mul(HB_IIR[1], s0 - a1) + h0, u1 = mul(HB_IIR[3], t1 - b1) + a1;
             h0 = s0; a0 = t0; b0 = u0; a1 = t1; b1 = u1;
-            output[2 * n] = knee(u0);
-            output[2 * n + 1] = knee(u1);
+            output[2 * n] = clamp(2 * u0, -HALF_SCALE, HALF_SCALE);
+            output[2 * n + 1] = clamp(2 * u1, -HALF_SCALE, HALF_SCALE);
         }
         v.chain[4] = g1; v.chain[5] = g2; v.chain[6] = e1; v.chain[7] = e2;
         v.hb[0] = h0; v.hb[1] = a0; v.hb[2] = b0; v.hb[3] = a1; v.hb[4] = b1;

@@ -3,7 +3,7 @@
 // The reference engine (port-kit/engine/rings.c) is compiled into this test twice: as it is (float, the spec), and in
 // double precision, where the machine's own algorithm is built on the reference's state and set-up (dbl::block_v: the
 // voice at half the output rate, the FM core with op2 stepping four reference samples, the modes run undamped and fed
-// in pairs or every sample, the half-band to the output rate and the boost's knee). Every render in
+// in pairs or every sample, the half-band to the output rate). Every render in
 // port-kit/reference/manifest.json goes through the Q31 port and that model, as the machine runs it (ATTACK 0,
 // SUSTAIN 1: on the device the stock amp envelope shapes the sound), and they are compared sample by sample at four
 // stages: the FM core, the resonator's drive, the mix after the modes, and the output. That checks the fixed point.
@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <complex>
+#include <algorithm>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -211,17 +212,7 @@ static void modal_block_v(rings_t* v, float* x)
     for (int n = 0; n < STEPV; ++n) x[n] = dry * x[n] + mix * y[n];
 }
 // The half-band to the output rate (engine.cpp): two paths of first-order allpasses on half the voice's output.
-static const double BOOSTED_D = 1.4125375446227544;   // +3 dB (tools/gen_tables.py, BOOST_DB)
 static double hb_state[5];
-// The boost's soft knee (engine.cpp, knee), on the boosted output: unchanged to 3/4 of the half-scale ceiling, then
-// bending onto it at 5/4 of it.
-static double knee_d(double x)
-{
-    const double z = x / 4, a = fabs(z), k = 3.0 / 32, w = 1.0 / 32;
-    if (a <= k) return x;
-    const double d = a - k, y = d >= 2 * w ? 0.5 : 4 * (a - d * d / (4 * w));
-    return z < 0 ? -y : y;
-}
 // The machine's whole block (engine.cpp) on the reference's state, in double precision, with its stages in the
 // port's units: core, drive and mix at the voice rate (at its index atv), the output at the output rate (ato). fir holds
 // the low-pass FIR's last two inputs.
@@ -258,7 +249,6 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
     const float gsx = DIST_PAD * G_FX * v->outgain;
     double c[4];
     for (int i = 0; i < 4; ++i) c[i] = rings::HB_IIR[i] / 2147483648.0;
-    const double half_boost = BOOSTED_D / 2, top = rings::VOICE_TOP / 2147483648.0;
     double* q = hb_state;
     for (int n = 0; n < STEPV; ++n) {
         const float g = o0 + (o1 - o0) * (float)(n + 1) / STEPV;
@@ -266,13 +256,12 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
         const float lp = fir[1] + h * (fir[0] + in - 2.f * fir[1]);
         fir[0] = fir[1]; fir[1] = in;
         double o = bq_run(&st2, lp * g);             // the onset's second gain before the band
-        o *= half_boost;                             // the band carries half the boost (engine.cpp, L_OUT)
-        o = (o > top ? top : (o < -top ? -top : o)) / 2;
+        o = (o > 0.5 ? 0.5 : (o < -0.5 ? -0.5 : o)) / 2;
         const double t0 = c[0] * (o - q[1]) + q[0], u0 = c[2] * (t0 - q[2]) + q[1];
         const double t1 = c[1] * (o - q[3]) + q[0], u1 = c[3] * (t1 - q[4]) + q[3];
         q[0] = o; q[1] = t0; q[2] = u0; q[3] = t1; q[4] = u1;
-        tap[3][ato + 2 * n] = knee_d(4 * u0);
-        tap[3][ato + 2 * n + 1] = knee_d(4 * u1);
+        tap[3][ato + 2 * n] = std::max(-0.5, std::min(0.5, 2 * u0));   // the ceiling
+        tap[3][ato + 2 * n + 1] = std::max(-0.5, std::min(0.5, 2 * u1));
     }
 }
 #undef float
@@ -298,8 +287,7 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
 
 namespace {
 
-const double GAIN = 143.0 * 3.9810717055349722;   // the machine's band gain against the reference page's: 143, +12 dB
-const double BOOSTED = 1.4125375446227544;         // and the boost after it, +3 dB (engine.cpp, knee)
+const double GAIN = 143.0 * 3.9810717055349722 * 1.1220184543019633;   // the machine's gain against the reference page's: 143, +12 dB, +1 dB (BOOST_DB)
 const opxy::i32 DECLARED_PEAK = 1073741823;  // definition.json outputPeakQ31 (half scale; the engine clips there)
 
 struct Setting { const char* name; int note; double drop, ratio, stretch, modes; };
@@ -369,7 +357,7 @@ void spec_run(const Setting& s, double* out, float* buffer) {
     rings_set_gain(&v, (float)GAIN);
     rings_note_on(&v, s.note);
     rings_process(&v, buffer, N);
-    for (int i = 0; i < N; ++i) out[i] = buffer[i] * BOOSTED;
+    for (int i = 0; i < N; ++i) out[i] = buffer[i];
 }
 
 double note_hz_ref(int n) { return 440.0 * std::exp2((n - 69) / 12.0) * TUNE_RATIO; }
