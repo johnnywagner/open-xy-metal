@@ -10,9 +10,9 @@
 // passes, bouncing back off the far end. And each ring pulses, wider and narrower and out and in, at a rate that
 // rises with its mode and dies away with its ring time. And each ring can bob up and down on its own, each at its own
 // rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can fill the rings with
-// a radial gradient across a knob: white at the centre through the OP-XY's greys to its darkest, in five steps (the
-// screen draws flat colours only), growing from the centre until it fills the ring's width, breathing with its pulse.
-// Screen work only (screen v11).
+// a gradient across a knob: white at the centre through the OP-XY's greys to its darkest at the outline, in steps
+// that follow the ring's shape (the screen draws flat colours only), growing from the centre until it fills the ring,
+// breathing with its pulse. Screen work only (screen v12).
 #include "display.h"
 #include "display_tables.h"
 
@@ -54,7 +54,7 @@ const i32 BOB_FADE_INV = 410;          // Q10 per second: a note's bob dies away
 const i32 BOB_RATE[12] = {1024, 851, 1198, 932, 1116, 788, 1260, 973, 1075, 891, 1157, 819};
 const i32 CHAIN_MOST = 40;             // pixels: no ring is pushed further
 const i32 CHAIN_FASTEST = 1000;        // pixels a second: nor moves faster
-const i32 PIECES = 15;                 // nodes per ring: the ring's 10 pieces, then the gradient's 5 discs
+const i32 PIECES = 21;                 // nodes per ring: the fill's 11 pieces, then the outline's 10 (gen_panel.py)
 // The palette: white strokes 0.375 px x 1.284^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale s takes the
 // widest entry within 1.133 of the width it should show divided by s, so every piece shows within 12 % of it.
 const i32 WIDTHS[16] = {384, 493, 633, 813, 1044, 1340, 1721, 2209, 2837, 3643, 4677, 6005, 7711, 9901, 12713, 16323};
@@ -209,20 +209,48 @@ inline u32 root(u32 v) {
     return r;
 }
 
-// The gradient in one ring (centre cx, cy; half width a, half height b; Q10 pixels), as much as `fill` (Q10, 0 .. 1):
-// five discs, one over the next, the artwork's circles of radius 16, 12.8, 9.6, 6.4 and 3.2 px filled from the
-// OP-XY's darkest grey to white, all at one scale, so their steps keep the same proportions. Its radius grows with the
-// knob up to the ring's half width (or half height, if less), less 2 px; `breath` (Q10, -1 .. 1) swells it with the
-// ring's pulse, and `slide` (Q10 pixels) moves it against the ring's motion.
+// The fill in one ring (centre cx, cy; half width a, half height b; Q10 pixels), as much as `fill` (Q10, 0 .. 1).
+// Three grey steps, then a white core, each a box inset from the ring's edge by a quarter of its half width more
+// than the last, so the steps follow the ring's shape. The artwork's capsules are 20 px wide and 1, 4 and 16 times as
+// tall, and can only be scaled whole: a step shows the tallest that fits its box by its width and the shortest that
+// fits by its height, crossed, so between them they fill it but its corners. The core is a white line as wide as its
+// box (the palette makes the width) over a white disc. The fill grows with `fill` from the centre, swells with
+// `breath` (Q10, -1 .. 1, the ring's pulse) and moves by `slide` (Q10 pixels) against the ring's motion.
 template <class F>
 void chrome(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 fill, i32 breath, i32 slide) {
-    const i32 most = (a < b ? a : b) - 2 * unit;
-    i32 radius = (((most >> 4) * clamp(fill, 0, unit)) >> 6);
-    radius += ((radius >> 4) * ((breath * 154) >> 10)) >> 6;          // +/- 15 % with the pulse
-    const i32 scale = radius >> 4;                                    // the outer disc is 16 px
-    if (most <= 0 || scale < 40) { for (u32 i = 0; i < 5; ++i) hide(frame, first + i); return; }
+    static const i32 TALLER[3] = {1, 4, 16};
+    static const i32 PER[3] = {3277, 819, 205};                       // 65536 / (20 x tall)
+    i32 grow = clamp(fill, 0, unit);
+    grow += ((grow >> 4) * ((breath * 154) >> 10)) >> 6;              // +/- 15 % with the pulse
     slide = clamp(slide, -(a >> 3), a >> 3);
-    for (u32 i = 0; i < 5; ++i) place(frame, first + i, cx + slide, cy, clamp(scale, 1, 2 * unit), 0, keep);
+    const i32 x = cx + slide;
+    for (i32 k = 0; k < 4; ++k) {
+        const i32 inset = unit + ((a * k) >> 2);
+        const i32 w = (((2 * (a - inset)) >> 4) * grow) >> 6, h = (((2 * (b - inset)) >> 4) * grow) >> 6;
+        if (k < 3) {
+            i32 lower = -1, upper = -1;
+            for (i32 v = 0; v < 3; ++v) {
+                if (TALLER[v] * w <= h) lower = v;
+                if (upper < 0 && TALLER[v] * w >= h) upper = v;
+            }
+            for (i32 v = 0; v < 3; ++v) {
+                const u32 node = first + 3 * static_cast<u32>(k) + static_cast<u32>(v);
+                const i32 scale = v == lower ? (w * 3277) >> 16 : v == upper ? (h * PER[v]) >> 16 : 0;
+                if (w < unit || scale < 20) hide(frame, node);
+                else place(frame, node, x, cy, clamp(scale, 1, 2 * unit), 0, keep);
+            }
+        } else {
+            // the core: a white disc as wide as its box (or as tall, if less), and a white line down it
+            const i32 across = w < h ? w : h;
+            const i32 disc = (across * 3277) >> 16;
+            if (w < unit || disc < 20) hide(frame, first + 9);
+            else place(frame, first + 9, x, cy, clamp(disc, 1, 2 * unit), 0, keep);
+            const i32 length = h - w;
+            if (w < unit || length < 2 * unit) { hide(frame, first + 10); continue; }
+            const i32 scale = clamp(length >> 6, SMALLEST, 2 * unit);
+            place(frame, first + 10, x, cy, scale, stroke_for(scale, w), stroke);
+        }
+    }
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -355,11 +383,11 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         const i32 left_at = state.at[5 - k], right_at = state.at[6 + k];
         const i32 lx = MIDDLE_X * unit - x + left_at, rx = MIDDLE_X * unit + x + right_at;
         const i32 ly = MIDDLE_Y * unit + bobbed[5 - k], ry = MIDDLE_Y * unit + bobbed[6 + k];
-        ring(frame, (2 * k) * PIECES, lx, ly, a, b, r, width);
-        ring(frame, (2 * k + 1) * PIECES, rx, ry, a, b, r, width);
+        ring(frame, (2 * k) * PIECES + 11, lx, ly, a, b, r, width);
+        ring(frame, (2 * k + 1) * PIECES + 11, rx, ry, a, b, r, width);
         // the highlights slide against the ring's motion: its push along the chain, and its pulse
-        chrome(frame, (2 * k) * PIECES + 10, lx, ly, a, b, shine, sway, -(state.speed[5 - k] >> 8));
-        chrome(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, shine, sway, -(state.speed[6 + k] >> 8));
+        chrome(frame, (2 * k) * PIECES, lx, ly, a, b, shine, sway, -(state.speed[5 - k] >> 8));
+        chrome(frame, (2 * k + 1) * PIECES, rx, ry, a, b, shine, sway, -(state.speed[6 + k] >> 8));
     }
 }
 } // namespace metal
