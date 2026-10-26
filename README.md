@@ -125,7 +125,8 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
   voice rate, stored near their poles.
 - **Modes** are the reference's two-pole resonators, run undamped, with their decay (`r^8`) applied every 8 voice
   samples. Below VR/4 (5.5 kHz) they take the drive once per two samples as the pair's sum (gain corrected by
-  `1/cos(th/2)`), above it every sample; two modes per loop share the input and the accumulator. Low modes keep
+  `1/cos(th/2)`), above it every sample. Each mode runs through the whole block in its own loop: with the Blackfin's
+  eight data registers, two modes per loop spilled more than sharing the input saved. Low modes keep
   `2 - 2 cos th` as their coefficient, so a mode at 20 Hz holds its tuning to about 0.05 cents.
 - **STRIKE** rings through its own copy of each mode for the note's first 8 voice samples, then joins the mode rotated
   by the filters it skips in the reference (magnitude and phase).
@@ -139,20 +140,36 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
 
 ## CPU
 
-Counting instructions per voice block with the Q31 multiply as the one instruction it is on the Blackfin+ (valgrind,
-the most repeatable figure here), at 440 Hz as the SDK times it:
+Blackfin instructions per voice block, counted on the GNU Blackfin simulator running the SDK's own compiler output
+(the pinned GCC 8 fork, `-mcpu=bf707 -O2`; the simulator given the Blackfin+ 32-bit multiply it lacked), at 440 Hz:
 
-| Setting | rings | before the half-rate voice (8 modes) | 2op FM |
+| Setting | rings | before the final pass | 2op FM |
 | --- | --- | --- | --- |
-| The defaults (MODES 2) | 8,050 | 10,850 | 5,600 |
-| MODES 6 (MODES 8 before) | 10,100 | 14,100 | |
-| RATIO 1 | 8,050 | 11,750 | |
-| A note-on block (new pitch) | 15,800 | 22,500 | |
+| The defaults (MODES 2), a held note | 5,930 | 8,100 | 4,900 (its defaults) |
+| The defaults, while the drop runs (up to the first 90 ms) | 6,490 | 8,850 | |
+| MODES 6 | 7,390 | 10,280 | |
+| A note-on block, a fresh voice (defaults) | 15,190 | 18,390 | |
+| A note-on block, a fresh voice (MODES 6) | 18,590 | 22,690 | |
 
-`sdk.py test` estimates about 22,000 to 27,000 Blackfin instructions per voice block at the heaviest setting, before
-and after the half-rate voice alike; 2op FM reads about 14,000. The estimate times the host, where the SDK's
-portable Q31 multiply takes a dozen instructions and an unpredictable branch, so it is mostly a count of multiplies,
-and the half-rate voice saved loads, stores and arithmetic, not multiplies (about 600 a block at the defaults either way). It varies by a fifth between runs. No device measurement has been made.
+A block is 1.45 ms, about 580,000 cycles at 400 MHz: eight held voices take about 10% of it at MODES 6, and eight
+voices starting in the same block about a quarter. The Blackfin+ predicts branches, so a count of instructions is the
+fair measure; data stalls and cache misses come on top (the voice's code is 13 KB, the instruction cache 16 KB).
+
+The final pass changed no output: the port renders bit for bit what it did before, checked over a grid of 1,876
+settings (pitch, knobs, retriggers, knob moves, glides) on the host and on the simulator. What it did:
+
+- The output stage runs as three loops (the FIR, the band two samples at a time, the half-band) instead of one that
+  spilled most of its state; the drive's high-pass, two samples at a time, also forms the modes' input.
+- The FM core runs op2 and the carrier as separate loops, with op2's feedback carried ahead and the carrier's gliding
+  increment kept as one running sum. op2's depth stays below 2, so the clamp after it was dead and went.
+- Each mode runs through the whole block at once (above), with no per-step dispatch.
+- log2 normalises through a byte table of leading zeros. log2 of each mode's sin th, of the material ratios' lattice
+  distances and of the note are kept, not worked out again per note-on, per block or per step, and the set-up
+  functions stay out of the per-block code.
+
+`sdk.py test` estimates about 19,400 Blackfin instructions per voice block at the heaviest setting. The estimate times
+the host, where the SDK's portable Q31 multiply takes a dozen instructions and an unpredictable branch, so it is mostly
+a count of multiplies. No device measurement has been made.
 
 ## Voices
 
