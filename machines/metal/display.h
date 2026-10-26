@@ -10,6 +10,7 @@ struct DisplayState {
     opxy::u32 initialized, track, previous_event;
     opxy::i32 ages[6];       // Q10 seconds since each mode was struck
     opxy::u32 phases[6];     // each mode's swing, a full cycle per 2^32
-    opxy::i32 drop_age;      // Q10 seconds since the note started, for DROP
+    opxy::i32 drop_age;      // Q10 seconds since the note started, for DROP and the sway
+    opxy::u32 sway_phase;    // the whole array's sway, a full cycle per 2^32
 };
 }
