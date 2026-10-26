@@ -13,6 +13,10 @@ from pathlib import Path
 import numpy as np
 
 FS = 44100.0
+# The voice runs at half the output rate (VR, 22.05 kHz) in steps of VSTEP samples (the reference's 16-sample sub-block)
+# and is interpolated to FS at the end: the FM core and the modes have nothing above 11 kHz to keep.
+VR = FS / 2
+VSTEP = 8
 f32 = lambda x: float(np.float32(x))
 
 # ---- the reference's constants (rings.c) ----
@@ -25,15 +29,8 @@ SW_FROM, SW_TO, SW_CURVE, SW_CURVE2, SW_MID = 0.6274609374999999, 0.060000000000
 TM_FROM, TM_TO, TM_CURVE, TM_CURVE2, TM_MID = 0.49197265625000003, 0.6733984375000001, 0.6329296875, 0.6794140624999999, 0.66265625
 DIST_PAD, G_FM, G_FX = f32(0.0853168), f32(-1.5483), f32(-0.7249)
 HP_RATIO, HP_Q, LP_FC, LP_Q, HS_RATIO = 0.45, 0.7, 20708.0, 0.2, 6.0
-# Tonal mappings (not in the reference): the modes stop at fs/4; STRETCH's middle is the harmonic series; RATIO is
-# pulled onto simple op2 : carrier ratios.
-MODE_TOP = 0.25
-# With the first mode on the note and no lattice make-up, the modes catch more of the FM: their drive is trimmed.
-RES_TRIM_DB = -8.0
-RES_TRIM = 10 ** (RES_TRIM_DB / 20)
-STRETCH_HARM = 0.06
-MAGNETS = [1 / 8, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 2 / 5, 1 / 2, 3 / 5, 2 / 3, 3 / 4, 1]
-MAGNET_W = 0.07
+MODE_TOP = 0.495    # of VR: the modes stop just below its Nyquist (10.9 kHz), not at the reference's 0.45 fs
+RES_TRIM = 1.0      # the drive trim of the base tables; write_variant() sets the machine's
 ATTACK_MIN, RES_GAIN, STRIKE_P0 = 0.003, 2.66, 0.012
 BLOCK = 16
 MODAL_TAB = [[1, 2, 3, 4, 5, 6, 7, 8],
@@ -48,6 +45,10 @@ MODE_HASH = [0.31, -0.83, 0.62, -0.17, 0.94, -0.55, 0.08, -0.71]
 # clips at half scale, which only the loudest settings' first transient reaches.
 LEVEL_DB = 12.0
 OUT_GAIN = 143.0 * 10 ** (LEVEL_DB / 20)
+# BOOST_DB more (in the band's gain), into a soft knee past the half-band: unchanged up to 6 dB under the half-scale
+# ceiling, then bending (a quadratic, slope 1 to 0) onto it at 1.5 x the ceiling; above, the ceiling. Peaks (mostly the
+# strike's first transient) bend; the body seldom reaches the knee.
+BOOST_DB = 8.0
 CORE_X = 1.0         # the FM core's output is the reference's x (its carrier at 1/16 full scale; x = car / 2)
 DRIVE_SCALE = 8.0    # into and through the resonator: 8x the reference's level
 LOGQ = 24            # log2 values are Q24
@@ -164,15 +165,15 @@ T = 0.1 * 100 ** RDECAY
 rm = [2 ** (math.log2(MODAL_TAB[mi][k]) * (1 - u) + math.log2(MODAL_TAB[mi + 1][k]) * u) for k in range(8)]
 ra = [max(1, r) ** -pa for r in rm]
 rt = [max(1, r) ** -qk for r in rm]
-pole = [math.exp(-6.9078 / (T * rt[k] * FS)) for k in range(8)]
+pole = [math.exp(-6.9078 / (T * rt[k] * VR)) for k in range(8)]   # per voice sample
 bw = [6.9078 / (math.pi * T * rt[k]) + 1 for k in range(8)]
 spread = [MSPREAD * 50 * MODE_HASH[k] / 1200 for k in range(8)]
 Wp = 0.001 * 0.2 ** RTONE
 sa = STRIKE_P0 * RSTRIKE
 pulse = []
 n = 0
-while n / FS < Wp:
-    t = n / FS
+while n / VR < Wp:
+    t = n / VR
     pulse.append(-sa * 0.5 * (1 - math.cos(2 * math.pi * t / Wp)) / gs1)   # in drive units (the reference's / |gs1|)
     n += 1
 # The drive (x_d) is the reference's resonator input without its stage gain; the mix is x_d + 2^-MODE_SHIFT sum(modes),
@@ -183,7 +184,7 @@ WET_RATIO = WET / (1 - WET)
 lb = [log2q((1 - pole[k]) * 2 * math.sqrt(pole[k]) * ra[k] * RES_GAIN * WET_RATIO * MS * RES_TRIM) for k in range(8)]
 leps = [log2q((1 - pole[k]) ** 2 / (4 * pole[k])) for k in range(8)]
 # strike: bi = sin th sqrt(ra) RES_GAIN edge wk 2 / (Wp fs wsum)
-lbp = [log2q(RES_GAIN * 2 / (Wp * FS) * WET_RATIO * MS) for k in range(8)]
+lbp = [log2q(RES_GAIN * 2 / (Wp * VR) * WET_RATIO * MS) for k in range(8)]
 # the mix to the output: the dry share, both stage gains and the output gain (143)
 OUT_G = (1 - WET) * gs1 * gs2
 # ---- DROP ----
@@ -201,7 +202,7 @@ def rbj_lp(f, Q):
     w0 = 2 * math.pi * f / FS; al = math.sin(w0) / (2 * Q); c = math.cos(w0); a0 = 1 + al
     return [(1 - c) / 2 / a0, (1 - c) / a0, (1 - c) / 2 / a0], [1, -2 * c / a0, (1 - al) / a0]
 lp_b, lp_a = rbj_lp(LP_FC, LP_Q)
-strike = pulse + [0.0] * (16 - len(pulse))      # padded to the 16-sample step the strike runs in
+strike = pulse + [0.0] * (VSTEP - len(pulse))   # padded to the step the strike runs in
 
 # The presence peak (4x the note, Q 0.8, +10.3 dB) and the high shelf (6x the note, slope 1, +7.7 dB) as one biquad:
 # an analog prototype in s / (2 pi f0), fitted to their product (scipy least squares on log magnitude, 0.05..60 x the
@@ -252,20 +253,50 @@ def strike_gain(r):
     return hp_analog(r) * eq_fit(r) / (hp_pk(r) / hp_analog(r) * chain_band(r))
 strike_g = [strike_gain(2 ** (i / 16 - 4)) for i in range(161)]
 
-# Both fixed low-passes as one 3-tap linear-phase FIR with DC gain 1, x1 + h (x0 + x2 - 2 x1): |H|^2 of the
-# low-pass, least squares to 16 kHz (within 0.7 dB to 8 kHz, 0.9 dB to 12 kHz, 1.3 dB to 16 kHz).
-fr = np.linspace(10, 20000, 3000)
+# Both fixed low-passes as one 3-tap linear-phase FIR at the voice rate with DC gain 1, x1 + h (x0 + x2 - 2 x1): |H|^2 of
+# the low-pass (at FS, where the reference runs it), least squares to 10.9 kHz.
+fr = np.linspace(10, 10900, 3000)
 zz = np.exp(-1j * 2 * np.pi * fr / FS)
 target = np.abs((lp_b[0] + lp_b[1] * zz + lp_b[2] * zz * zz) / (lp_a[0] + lp_a[1] * zz + lp_a[2] * zz * zz)) ** 2
-basis = np.stack([np.ones_like(fr), 2 * np.cos(2 * np.pi * fr / FS)], 1)
-weight = np.where(fr < 16000, 1.0, 0.2)
-fir = np.linalg.lstsq(basis * weight[:, None], target * weight, rcond=None)[0]
+basis = np.stack([np.ones_like(fr), 2 * np.cos(2 * np.pi * fr / VR)], 1)
+fir = np.linalg.lstsq(basis, target, rcond=None)[0]
 fir = fir / (fir[0] + 2 * fir[1])
-# h rounded to 1/8 + 1/512, so the engine applies it with two shifts
-assert abs(fir[1] - (1 / 8 + 1 / 512)) < 5e-4, fir[1]
-fir = np.array([1 - 2 * (1 / 8 + 1 / 512), 1 / 8 + 1 / 512])
-fir_err = 20 * np.log10(np.abs(basis @ fir)[fr < 16000] / target[fr < 16000])
-assert np.max(np.abs(fir_err)) < 1.4, np.max(np.abs(fir_err))
+fir_err = 20 * np.log10(np.abs(basis @ fir) / target)
+assert np.max(np.abs(fir_err)) < 0.5, np.max(np.abs(fir_err))
+# h rounded to 1/32 + 1/1024, so the engine applies it with two shifts
+assert abs(fir[1] - (1 / 32 + 1 / 1024)) < 2e-4, fir[1]
+fir = np.array([1 - 2 * (1 / 32 + 1 / 1024), 1 / 32 + 1 / 1024])
+fir_err = 20 * np.log10(np.abs(basis @ fir) / target)
+assert np.max(np.abs(fir_err)) < 0.5, np.max(np.abs(fir_err))
+
+# The voice to the output rate: a polyphase IIR half-band (two paths of first-order allpasses in z^-2, 4 coefficients;
+# the elliptic design of Valenzuela and Constantinides, as in Laurent de Soras' hiir), transition 0.08 of the output
+# rate: flat to 9 kHz, images above 13 kHz 63 dB down. Even outputs are path 0 of each voice sample, odd ones path 1.
+def _hb_trans(tbw):
+    k = math.tan((1 - tbw * 2) * math.pi / 4) ** 2
+    kk = (1 - k * k) ** 0.25
+    e = 0.5 * (1 - kk) / (1 + kk); e4 = e ** 4
+    return k, e * (1 + e4 * (2 + e4 * (15 + 150 * e4)))
+def _hb_sum(q, order, c, num):
+    i, j, acc = (0, 1, 0.0) if num else (1, -1, 0.0)
+    while True:
+        t = (q ** (i * (i + 1)) * math.sin((i * 2 + 1) * c * math.pi / order) if num
+             else q ** (i * i) * math.cos(i * 2 * c * math.pi / order)) * j
+        acc += t; j = -j; i += 1
+        if abs(t) <= 1e-100: return acc
+def _hb_coefs(n, tbw):
+    k, q = _hb_trans(tbw); order = n * 2 + 1; out = []
+    for c in range(1, n + 1):
+        ww = _hb_sum(q, order, c, True) * q ** 0.25 / (_hb_sum(q, order, c, False) + 0.5); w2 = ww * ww
+        x = math.sqrt((1 - w2 * k) * (1 - w2 / k)) / (1 + w2)
+        out.append((1 - x) / (1 + x))
+    return out
+HB_IIR = _hb_coefs(4, 0.08)
+_f = np.linspace(1, 22049, 20000); _z2 = np.exp(-2j * np.pi * _f / FS * 2)
+_A = [np.ones_like(_z2), np.ones_like(_z2)]
+for _i, _a in enumerate(HB_IIR): _A[_i % 2] = _A[_i % 2] * (_a + _z2) / (1 + _a * _z2)
+_H = 20 * np.log10(np.abs(0.5 * (_A[0] + _A[1] * np.exp(-2j * np.pi * _f / FS)) + 1e-15))
+assert np.max(np.abs(_H[_f < 9000])) < 0.01 and np.max(_H[_f > 13050]) < -60
 
 # ---- write ----
 out.append('// Generated by tools/gen_tables.py from the float reference engine. Do not edit.')
@@ -284,8 +315,9 @@ const('ATTACK_STEP', q(att_step), "the onset's linear level ramp per 16 samples 
 table('EASE', [qs(w) for w in ease], comment="the onset's ease-in (smoothstep) after each 16 samples, Q31")
 const('MODE_SHIFT', MODE_SHIFT, 'the mode states carry 2^this x their share of the mix')
 const('LEVEL_DB', int(LEVEL_DB), 'the output level over the brief (dB)')
-const('LP_FIR', q(fir[1]), 'both fixed 20.7 kHz low-passes (Q 0.2) as one 3-tap linear-phase FIR, DC gain 1: x1 + h (x0 + x2 - 2 x1), h = 1/8 + 1/512, Q31')
-const('L_OUT', log2q(OUT_G), 'log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB; folded into the EQ')
+const('LP_FIR', q(fir[1]), 'both fixed 20.7 kHz low-passes (Q 0.2) as one 3-tap linear-phase FIR at the voice rate, DC gain 1: x1 + h (x0 + x2 - 2 x1), h = 1/32 + 1/1024, Q31')
+table('HB_IIR', [q(x) for x in HB_IIR], comment='the half-band to the output rate: allpass coefficients, even ones path 0 (even outputs), odd ones path 1, Q31')
+const('L_OUT', log2q(OUT_G * 10 ** (BOOST_DB / 20) / 2), 'log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB, and BOOST_DB / 2 (the knee takes half the signal at a quarter scale); folded into the EQ')
 const('HP_RATIO', q(HP_RATIO), 'keytracked high-pass at 0.45 x the note, Q31')
 const('L_CH_A1', log2q(CHAIN['a1']), 'the chain after the modes, analog prototype in s / (2 pi f0): high-pass, log2 a1')
 const('L_CH_A0', log2q(CHAIN['a0']), 'log2 a0')
@@ -295,33 +327,25 @@ const('L_CH_C1', log2q(CHAIN['c1']), 'log2 c1')
 const('L_CH_C0', log2q(CHAIN['c0']), 'log2 c0')
 const('HALF_SCALE', (1 << 30) - 1, 'the output ceiling: half scale, the SDK limit')
 const('SINE_CURVE', q((2 * math.pi / 2048) ** 2 / 2), "sine(): the table's curvature, (2 pi / 2048)^2 / 2, Q31")
-const('INC_LIMIT', int(MODE_TOP * 2 ** 32), 'the modes stop at fs/4 (11 kHz) as a phase increment')
-const('INC_SIXTH', int(2 ** 32 / 7), 'modes below fs/7 keep 2 - 2 r cos th as a Q31 coefficient')
-const('INC_EIGHTH', int(2 ** 32 / 8), 'modes below fs/8 take their input once per four samples')
-const('OP2_HALF_RATE', int(round(260 / FS * 2 ** 32)), 'op2 runs at half rate while slower than this (260 Hz) as a 1x increment')
-const('INC_DROP_LIMIT', int(0.4 * 2 ** 32), 'the drop keeps the carrier below 0.4 fs (0.2 of the reference 2x rate)')
-const('INC_20HZ', int(round(20 / FS * 2 ** 32)), '20 Hz as a phase increment')
-const('L_INC_20HZ', log2q(20 / FS * 2 ** 32), 'its log2')
-const('L_INC_NY', log2q(MODE_TOP * 2 ** 32), 'log2 of the top (fs/4) as an increment')
+const('INC_LIMIT', int(MODE_TOP * 2 ** 32), 'the modes stop just below the voice rate\'s Nyquist (10.9 kHz), as a voice-rate phase increment')
+const('INC_SIXTH', int(2 ** 32 / 7), 'modes below VR/7 keep 2 - 2 r cos th as a Q31 coefficient')
+const('INC_QUARTER', int(2 ** 32 / 4), 'modes below VR/4 (5.5 kHz) take their input once per two voice samples; above, every sample')
+const('INC_DROP_LIMIT', int(0.225 * 2 ** 32), 'the drop keeps the carrier below 0.45 VR (9.9 kHz), as a 1x (output rate) increment')
+const('INC_20HZ', int(round(20 / VR * 2 ** 32)), '20 Hz as a voice-rate phase increment')
+const('L_INC_20HZ', log2q(20 / VR * 2 ** 32), 'its log2')
+const('L_INC_NY', log2q(MODE_TOP * 2 ** 32), 'log2 of the top as a voice-rate increment')
 const('L_INC_NY09', log2q(0.9 * MODE_TOP * 2 ** 32), 'log2 of 0.9 x the top: modes fade out above')
 const('L_INC_NY01', log2q(0.1 * MODE_TOP * 2 ** 32), 'log2 of 0.1 x the top')
-const('L_FS', log2q(FS), 'log2 44100')
+const('L_FS', log2q(VR), 'log2 of the voice rate, 22050')
 const('UP_POWER', q(0.75), 'make-up for modes moved up: (ratio)^0.75')
-const('RES_TRIM', q(RES_TRIM), 'the modes\' drive trim (RES_TRIM_DB), Q31: for the tests')
-const('STRETCH_HARM', q(STRETCH_HARM), "STRETCH within this of the middle (as 2 x - 1) is the harmonic series")
-const('STRETCH_MORPH_INV', q(1 / (0.5 - STRETCH_HARM), 29), 'harmonic to material over the rest of the first half of each side, 1 / its width, Q29')
-table('L_MAGNET', [log2q(m) for m in MAGNETS], comment="RATIO's magnets (op2 : carrier), log2, Q24")
-const('MAGNET_W', q(MAGNET_W, LOGQ), "RATIO is pulled onto a magnet within this many octaves of it, Q24")
-const('MAGNET_INV', int(2 ** 31 / (MAGNET_W * 2 ** LOGQ)), "2^31 / MAGNET_W in Q24 units: d / W as Q31")
+const('RES_TRIM', 0, 'replaced by write_variant()')
 const('DEPTH_BITE', q(depth0 * 3 * BITE, 29), 'FM depth added by BITE at note-on, Q29')
 const('FLUSH', 4096, 'an unfed mode quieter than this (-126 dBFS at the output) is silent')
 const('KK_MAKEUP', q(1 - math.exp(-64 / (FS * 0.02))), "make-up gain easing per 64 samples (the reference's 20 ms)")
 table('L_RM', [log2q(r) for r in rm], comment="log2 of each mode's material ratio, Q24")
-table('L_H', [log2q(k + 1) for k in range(8)], comment="log2 of the harmonic series, mode k at k + 1 times the note, Q24")
-table('L_RA', [log2q(r / rm[0]) for r in rm], comment="log2 of each mode's material ratio over the first mode's (the first on the note), Q24")
 table('L_SPREAD', [q(x, LOGQ) for x in spread], comment="each mode's fixed detune, log2, Q24")
 table('L_BW', [log2q(b) for b in bw], comment="log2 of each mode's bandwidth in Hz")
-table('DAMP16', [q(p ** 16) for p in pole], comment="each mode's decay over 16 samples, r^16 (ring 3.6 s x rt), Q31")
+table('DAMP16', [q(p ** VSTEP) for p in pole], comment="each mode's decay over a step (8 voice samples, 16 output samples), r^8 (ring 3.6 s x rt), Q31")
 table('L_B', lb, comment='log2 of (1 - r) 2 sqrt(r) ra RES_GAIN x wet / dry x 2^MODE_SHIFT: the input gain before sin th, sqrt(1 + eps), make-up, edge and MODES')
 table('L_EPS', leps, comment='log2 of (1 - r)^2 / (4 r): with sin(th)^2, the correction sqrt(1 + eps)')
 table('L_BP', lbp, comment='log2 of RES_GAIN 2 / (Wp fs) x wet x 2^MODE_SHIFT: STRIKE into each mode, before sin th and its share sqrt(ra) edge MODES / wsum')
@@ -377,8 +401,6 @@ dtable('DISPLAY_DROP_MS', [round(t0 * (t1 / t0) ** lane_pos(x, TM_MID, TM_CURVE,
        "DROP's time in ms at the knob's sixteenths, Q10")
 dtable('DISPLAY_DROP_LEFT', [round((1 - (i / 23) ** sweep_e) * 1024) for i in range(24)],
        "how much of the drop is left at 24 points through it (its fixed shape), Q10")
-dtable('DISPLAY_L_H', [round(math.log2(k + 1) * 1024) for k in range(8)], 'log2 of the harmonic series, Q10')
-dtable('DISPLAY_L_RA', [round(math.log2(r / rm[0]) * 1024) for r in rm], "log2 of each mode's material ratio over the first mode's, Q10")
 dtable('DISPLAY_RING', [round(min(4.0, 0.9 * rt[k]) * 1024) for k in range(8)],
        "how long each mode's halo lasts on screen after a note, seconds Q10 (upper modes ring shorter)")
 dtable('DISPLAY_RING_INV', [round(65536 / min(4.0, 0.9 * rt[k])) for k in range(8)], 'its reciprocal, Q16')
@@ -388,9 +410,9 @@ print('       pole 1-r', [f'{1 - p:.3g}' for p in pole], 'strike samples', len(p
 print(f'gains: drive {DRIVE_GAIN:.5f}  G2 {G2:.5f}  dry {DRY:.5f}  wet {WETG:.5f}')
 
 # ======================================================================================================================
-# rings2 and its variants: rings with the reference's own mode tuning (the material's ratios, STRETCH as 2^(2 x - 1)
-# on them, RATIO free and the reference's lattice make-up). Each tables.h is rings' (in its own namespace) with its own
-# drive trim, plus rings2's constants and the variant's own.
+# rings: the reference's own mode tuning (the material's ratios, STRETCH as 2^(2 x - 1) on them, RATIO free and the
+# reference's lattice make-up). Its tables.h is the tables above with its drive trim, plus these constants. (The
+# function takes a machine name: variants have been built from it.)
 def write_variant(name, trim_db, note, extra=None):
     global out
     trim = 10 ** (trim_db / 20)
@@ -400,7 +422,7 @@ def write_variant(name, trim_db, note, extra=None):
     lb = out; out = []
     const('RES_TRIM', q(trim, 29), f"the modes' drive trim ({trim_db:+.1f} dB: {note}), Q29: for the tests")
     tr = out; out = []
-    out.append("// ---- rings2: the reference's mode tuning")
+    out.append("// ---- the reference's mode tuning")
     const('RATIO_MIN', q(0.05), 'make-up: below this RATIO the lattice is the note alone')
     const('STRETCH_DEAD', q(0.01), 'STRETCH within this of the middle is none')
     table('RM_DIST', [q(abs(r - 1), 26) for r in rm], comment='|material ratio - 1|, Q26')
@@ -419,22 +441,5 @@ def write_variant(name, trim_db, note, extra=None):
     Path(f'machines/{name}/display_tables.h').write_text('\n'.join(dd).replace('namespace rings {', 'namespace %s {' % name) + '\n')
     print(f'machines/{name}/tables.h written')
 
-# rings2: its modes catch less of the FM than rings' did (the first below the note), so it keeps the reference's drive.
-write_variant('rings2', 0.0, 'none, the reference\'s drive')
-
-# rings5 and rings6: rings2 tuned. STRETCH places the modes as rings2 does, then each mode with a pitch-class mask is
-# moved to the nearest semitone of the note (12-TET, counted from the note) whose pitch class the mask allows; the
-# small fixed detune goes on after. The masks: bit p allows p semitones above the note (or octaves of it).
-CONSONANT = sum(1 << p for p in (0, 3, 4, 5, 7, 8, 9))   # unison/octaves, thirds, fourth, fifth, sixths
-CHROMATIC = (1 << 12) - 1
-def tune_tables(masks, what):
-    def extra():
-        out.append('// ---- ' + what)
-        const('SEMI', int(round((1 << 24) / 12)), 'a semitone, log2, Q24')
-        table('TUNE_MASK', masks, ctype='u32', comment="each mode's allowed pitch classes (bit p: p semitones above the note); 0: left where STRETCH puts it")
-    return extra
-# rings5, Tuned: the four lowest modes onto consonant intervals of the note, the four above left free (the metal).
-write_variant('rings5', 0.0, 'none: level with rings2 at every STRETCH', tune_tables([CONSONANT] * 4 + [0] * 4, 'rings5: the four lowest modes tuned to consonant intervals'))
-# rings6, Chromatic: every mode onto the nearest semitone of the note.
-write_variant('rings6', 0.0, 'none: level with rings2 at every STRETCH', tune_tables([CHROMATIC] * 8, 'rings6: every mode tuned to the nearest semitone'))
-
+# Its modes catch less of the FM than the tonal version's did (the first below the note): the reference's drive.
+write_variant('rings', 0.0, 'none, the reference\'s drive')

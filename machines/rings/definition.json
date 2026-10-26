@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "id": "rings5",
-  "name": "Rings 5",
+  "id": "rings",
+  "name": "Rings",
   "parameters": [
     {
       "id": "drop",
@@ -49,7 +49,7 @@
     }
   ],
   "presets": {
-    "Rings 5": {
+    "Rings": {
       "drop": 0,
       "ratio": 0.08855468749999998,
       "stretch": 1,
@@ -81,7 +81,7 @@
     }
   },
   "resources": {
-    "voiceBytes": 852,
+    "voiceBytes": 780,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
     "sharedBytes": 0,
