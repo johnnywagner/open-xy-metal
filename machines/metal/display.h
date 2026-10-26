@@ -2,10 +2,10 @@
 #include <opxy/draw.hpp>
 
 namespace metal {
-// Twelve rings (the six modes, mirrored about the middle), each drawn from ten pieces: four quarter arcs, two
-// straight pieces down each side, one across the top and one across the bottom; then five discs of gradient.
+// Twelve rings (the six modes, mirrored about the middle), each drawn as its fill (eleven pieces), then its outline
+// (ten: four quarter arcs, two straight pieces down each side, one across the top and one across the bottom).
 // No paths or text; 16 white strokes of different widths (a piece takes the width that undoes its scale).
-using Frame = opxy::draw::Frame<0, 0, 180, 0, 16>;
+using Frame = opxy::draw::Frame<0, 0, 252, 0, 16>;
 struct DisplayState {
     opxy::u32 initialized, track, previous_event;
     opxy::i32 ages[6];       // Q10 seconds since each mode was struck
