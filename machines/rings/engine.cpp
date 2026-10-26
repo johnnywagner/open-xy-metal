@@ -426,16 +426,17 @@ void clear(Voice& voice) {
     for (unsigned i = 0; i < sizeof(Voice) / sizeof(u32); ++i) words[i] = 0;
 }
 
-// The boost's soft knee, on a quarter of the signal (z, the half-scale ceiling at 2^28): unchanged below half the
-// ceiling, then z - (z - k)^2 / (4 k) up to 3 k, where it meets the ceiling with slope 0; the ceiling above. Returns the
-// full-scale output. The voice's output stage runs at half the boosted level (z = half its output): VOICE_TOP keeps
-// it where the knee has reached the ceiling, with room for the half-band's overshoot.
+// The boost's soft knee, on a quarter of the signal (z, the half-scale ceiling at 2^28): unchanged up to 3/4 of the
+// ceiling (k), then z - (z - k)^2 / (4 w) (w the quarter of the ceiling left) up to k + 2 w, where it meets the ceiling
+// with slope 0; the ceiling above. Returns the full-scale output. The voice's output stage runs at half the boosted
+// level (z = half its output): VOICE_TOP keeps it where the knee has reached the ceiling, with room for the half-band's
+// overshoot.
 const i32 VOICE_TOP = 7 << 27;
 inline i32 knee(i32 z) {
-    const i32 k = 1 << 27, a = absolute(z);
+    const i32 k = 3 << 26, a = absolute(z);
     if (a <= k) return 4 * z;
     const i32 d = a - k;
-    const i32 y = d >= 2 * k ? HALF_SCALE : clamp(4 * (a - mul(d, d) * 4), 0, HALF_SCALE);
+    const i32 y = d >= 2 << 26 ? HALF_SCALE : clamp(4 * (a - mul(d, d) * 8), 0, HALF_SCALE);
     return z < 0 ? -y : y;
 }
 

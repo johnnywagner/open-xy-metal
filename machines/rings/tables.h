@@ -23,7 +23,7 @@ const i32 LP_FIR = 69206016;                    // both fixed 20.7 kHz low-passe
 const i32 HB_IIR[4] = {
     197557165, 680984497, 1255120069, 1834337730,
 };
-const i32 L_OUT = 17309262;                     // log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB, and BOOST_DB / 2 (the knee takes half the signal at a quarter scale); folded into the EQ
+const i32 L_OUT = 3376085;                      // log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB, and BOOST_DB / 2 (the knee takes half the signal at a quarter scale); folded into the EQ
 const i32 HP_RATIO = 966367642;                 // keytracked high-pass at 0.45 x the note, Q31
 const i32 L_CH_A1 = -28614723;                  // the chain after the modes, analog prototype in s / (2 pi f0): high-pass, log2 a1
 const i32 L_CH_A0 = -36996515;                  // log2 a0
