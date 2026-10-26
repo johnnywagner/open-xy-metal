@@ -1,11 +1,10 @@
-// rings5's page: the eight modes as circles, spaced by their ratio to the note (STRETCH spreads or squeezes them),
+// rings' page: the eight modes as circles, spaced by their ratio to the note (STRETCH spreads or squeezes them),
 // lit by how much MODES feeds each; at each note a halo rings out of every fed mode and fades with that mode's ring
 // time. Below, the DROP: the pitch falling from its start offset onto the note, over its time. Screen work only.
 #include "display.h"
 #include "display_tables.h"
-#include "tables.h"
 
-namespace rings5 {
+namespace rings {
 namespace {
 using opxy::i32;
 using opxy::u32;
@@ -23,21 +22,6 @@ inline i32 exp2_q10(i32 s) {
     const i32 f = negative ? s + unit : s;     // fraction in [0, 1)
     const i32 v = unit + ((f * (672 + ((f * 352) >> 10))) >> 10);
     return negative ? v >> 1 : v;
-}
-
-// engine.cpp's tune() in Q10: the nearest semitone to l (Q10 octaves) whose pitch class mask allows, Q10 octaves.
-inline i32 tune_q10(i32 l, u32 mask) {
-    const i32 s = l * 12, n0 = (s + 512) >> 10;
-    i32 best = n0, gap = 1 << 30;
-    for (i32 n = n0 - 2; n <= n0 + 2; ++n) {
-        i32 pc = n;
-        while (pc < 0) pc += 12;
-        while (pc >= 12) pc -= 12;
-        if (!((mask >> pc) & 1u)) continue;
-        const i32 d = s - n * 1024 < 0 ? n * 1024 - s : s - n * 1024;
-        if (d < gap) { gap = d; best = n; }
-    }
-    return (best * 2731) >> 5;                                // x 1024 / 12
 }
 
 // Interpolates a 17-point table over a knob word.
@@ -128,13 +112,13 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     drop_trace(frame.paths[0], input.parameters[0]);
     place(frame, 0, 240 * unit, 186 * unit, 2 * unit, 9, stroke);
 
-    // the modes: x by log2 of the ratio, STRETCH as 2^(2 x - 1) on the material's log2 ratio, then tuned (engine.cpp, stretch_map)
+    // the modes: x by log2 of the ratio, STRETCH as 2^(2 x - 1) on the material's log2 ratio (engine.cpp, set_stretch)
     const i32 st = exp2_q10(fraction(input.parameters[2]) * 2 - unit);
     const i32 modes7 = fraction(input.parameters[3]) * 7;   // Q10: mode k is fed clamp(1 + 7x - k, 0, 1)
     for (u32 k = 0; k < 8; ++k) {
         const i32 fed = k == 0 ? unit : clamp(modes7 - static_cast<i32>(k - 1) * unit, 0, unit);
-        const i32 l = (DISPLAY_L_RM[k] * st) >> 10, lrr = TUNE_MASK[k] ? tune_q10(l, TUNE_MASK[k]) : l;   // Q10 octaves
-        const i32 x = clamp(120 * unit + lrr * 60, 12 * unit, 468 * unit);   // 60 px per octave, the note at 120
+        const i32 lrr = (DISPLAY_L_RM[k] * st) >> 10;         // Q10 octaves
+        const i32 x = clamp(96 * unit + lrr * 42, 0, 290 * unit);   // 42 px per octave, the note at 96
         const i32 size = unit + 640 - static_cast<i32>(k) * 72;
         const i32 left = state.ages[k] >= HALO_DONE ? 0
             : clamp(unit - ((state.ages[k] * DISPLAY_RING_INV[k]) >> 16), 0, unit);   // Q10, 1 at the note
@@ -148,4 +132,4 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
             hide(frame, 9 + k);
     }
 }
-} // namespace rings5
+} // namespace rings

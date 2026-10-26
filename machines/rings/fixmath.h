@@ -5,7 +5,7 @@
 #include <opxy/q31.hpp>
 #include "tables.h"
 
-namespace rings2 {
+namespace rings {
 
 const i32 MAX = opxy::q31::maximum;
 const i32 ONE_LOG = 1 << 24;      // 1.0 in a Q24 log2 value
