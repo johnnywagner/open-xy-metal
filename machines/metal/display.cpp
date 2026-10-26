@@ -9,8 +9,9 @@
 // left and right ends in turn) and the push travels along ring by ring, each wiggling on its own spring as it
 // passes, bouncing back off the far end. And each ring pulses, wider and narrower and out and in, at a rate that
 // rises with its mode and dies away with its ring time. And each ring can bob up and down on its own, each at its own
-// rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can fill the rings with
-// a metal texture, streaks like brushed steel coming in one by one across a knob. Screen work only (screen v7).
+// rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can make the rings chrome
+// across a knob: highlights inside each, a bright stripe down its left, a glint in its top corner, a dim rim light at
+// its bottom right and a reflection down its right, that slide as the ring moves. Screen work only (screen v8).
 #include "display.h"
 #include "display_tables.h"
 
@@ -28,12 +29,12 @@ const i32 TALLEST = 95;                // half the drawing's height
 // knobs through those slots, read as one stream of bits, 31 to a slot from slot 4's lowest:
 //   bits 0-79: ten settings of 8 bits (Setting below), each 0 for the value here, else 1 + 254ths of the range;
 //   bits 80-119: ten assignments of 4 bits (Drive below): bits 0-2 are 0 for the knob here, else the knob 1 .. 4,
-//     or 5 for none (the knob's default value; the whole amount for the chain, pulse and bob; no texture); bit 3
+//     or 5 for none (the knob's default value; the whole amount for the chain, pulse and bob; no chrome); bit 3
 //     inverts the knob;
 //   bits 120-121: the bob, 0 as here, 1 all the time, 2 on notes.
 enum Setting { KICK_SET, PASS_SET, WIGGLE_SET, RINGOUT_SET, PULSE_SET, JOLT_SET, BOB_DEPTH_SET, BOB_SPEED_SET,
                SPACE_DEPTH_SET, SPACE_CURVE_SET };
-enum Drive { SPACING, WIDTH, TALLEST_RING, SHAPE, STANDING, STRIKE_SIZE, CHAIN_AMOUNT, PULSE_AMOUNT, BOB, TEXTURE };
+enum Drive { SPACING, WIDTH, TALLEST_RING, SHAPE, STANDING, STRIKE_SIZE, CHAIN_AMOUNT, PULSE_AMOUNT, BOB, CHROME };
 const u32 KNOB_OF[10] = {3, 2, 2, 4, 4, 1, 5, 5, 5, 5};   // each drive's knob (1 DROP, 2 RATIO, 3 STRETCH, 4 MODES, 5 none)
 const i32 KNOB_REST[4] = {0, 91, 1023, 205};       // Q10: each knob's default, for a drive with no knob
 const i32 KICK = 807;                  // Q10: the kick, 600 x pixels a second (473)
@@ -52,22 +53,7 @@ const i32 BOB_FADE_INV = 410;          // Q10 per second: a note's bob dies away
 const i32 BOB_RATE[12] = {1024, 851, 1198, 932, 1116, 788, 1260, 973, 1075, 891, 1157, 819};
 const i32 CHAIN_MOST = 40;             // pixels: no ring is pushed further
 const i32 CHAIN_FASTEST = 1000;        // pixels a second: nor moves faster
-const i32 PIECES = 20;                 // nodes per ring: the ring's 10 pieces, then 10 streaks of texture
-// The texture's streaks, in each ring: height (Q10 of the ring's inside, up), place across (Q10 of the room either
-// side), length (Q10 of the width there), turn from level (tenths of a degree), stroke (Q10 of 1.4 px) and when it
-// comes in (in tenths of the knob).
-const i32 STREAK[10][6] = {
-    {-839, -380, 364, 8, 358, 8},
-    {-711, 68, 347, 27, 358, 3},
-    {-443, 174, 695, -38, 1331, 1},
-    {-285, -600, 454, 26, 512, 4},
-    {-119, -474, 386, -6, 1331, 7},
-    {130, -425, 694, 36, 512, 0},
-    {280, 64, 349, -38, 1331, 9},
-    {459, 240, 592, -5, 1024, 6},
-    {694, -62, 507, -22, 512, 2},
-    {838, -266, 637, -2, 1024, 5},
-};
+const i32 PIECES = 15;                 // nodes per ring: the ring's 10 pieces, then 5 highlights of chrome
 // The palette: white strokes 0.375 px x 1.284^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale s takes the
 // widest entry within 1.133 of the width it should show divided by s, so every piece shows within 12 % of it.
 const i32 WIDTHS[16] = {384, 493, 633, 813, 1044, 1340, 1721, 2209, 2837, 3643, 4677, 6005, 7711, 9901, 12713, 16323};
@@ -193,7 +179,7 @@ inline i32 lab_setting(const Input& input, Setting setting, i32 fallback) {
     return field ? static_cast<i32>((field - 1) * 4124) >> 10 : fallback;    // 254ths, as Q10
 }
 // What drives `drive`, Q10: its knob's value (inverted if the lab says), its knob's default when it has none (the
-// whole amount for the chain, the pulse and the bob; none of the texture), whichever the lab assigns.
+// whole amount for the chain, the pulse and the bob; no chrome), whichever the lab assigns.
 inline i32 driven(const Input& input, Drive drive) {
     const u32 field = lab_bits(input, 80 + 4 * drive, 4);
     const u32 knob = (field & 7) >= 1 && (field & 7) <= 5 ? field & 7 : KNOB_OF[drive];
@@ -201,7 +187,7 @@ inline i32 driven(const Input& input, Drive drive) {
         const i32 value = fraction(input.parameters[knob - 1]);
         return field & 8 ? unit - 1 - value : value;
     }
-    if (drive == TEXTURE) return 0;
+    if (drive == CHROME) return 0;
     if (drive >= CHAIN_AMOUNT) return unit;
     return KNOB_REST[KNOB_OF[drive] - 1];
 }
@@ -222,32 +208,68 @@ inline u32 root(u32 v) {
     return r;
 }
 
-// The texture in one ring (centre cx, cy; half width a, half height b, corner radius r): its streaks, each shown
-// once `shown` (Q10 of the knob, 0 .. 1) passes its tenth, growing in over that tenth. Each lies inside the ring
-// 2 px clear of its outline, across the ring's width at its height.
+// Chrome on one ring (centre cx, cy; half width a, half height b, corner radius r, all Q10 pixels), as much as
+// `shine` (Q10, 0 .. 1): its highlights come in as it rises. `slide` (Q10 pixels) moves them against the ring's
+// motion, so the light seems to stay put while the ring moves under it. Its five pieces, in order: the stripe, a
+// thinner stripe beside it, the glint, the rim light and the reflection.
 template <class F>
-void texture(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 shown) {
-    const i32 inside = b - 2 * unit;
-    for (u32 i = 0; i < 10; ++i) {
-        const i32* s = STREAK[i];
-        const i32 grown = clamp((shown - s[5] * 102) * 10, 0, unit);   // Q10: comes in over its tenth
-        if (grown <= 0 || inside <= 0) { hide(frame, first + i); continue; }
-        const i32 y = (inside >> 4) * s[0] >> 6;
-        // the ring's half width at y: a, less the round of a corner
-        i32 half = a;
-        const i32 into = (y < 0 ? -y : y) - (b - r);
-        if (into > 0) {
-            const u32 r4 = static_cast<u32>(r >> 6), d4 = static_cast<u32>(clamp(into, 0, r) >> 6);   // Q4 pixels
-            half = a - r + (static_cast<i32>(root(r4 * r4 - d4 * d4)) << 6);
+void chrome(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 shine, i32 slide) {
+    if (shine <= 0) { for (u32 i = 0; i < 5; ++i) hide(frame, first + i); return; }
+    const auto grown = [&](i32 from) { return clamp(((shine - from) * 2) , 0, unit); };   // in over half the knob
+    slide = clamp(slide, -(a >> 2), a >> 2);
+    const i32 straight_part = b - ((r * 614) >> 10);                  // the side, less 0.6 of the corner
+    // the stripe: down the left, 0.45 of the way out, 1.6 x the side long, 0.9 .. 2.2 px
+    {
+        const i32 g = clamp((shine * 3) >> 1, 0, unit);
+        const i32 length = ((((2 * straight_part) >> 4) * 819 >> 6) >> 4) * g >> 6;
+        if (length < 2 * unit) hide(frame, first);
+        else {
+            const i32 s = clamp(length >> 6, SMALLEST, 2 * unit);
+            place(frame, first, cx - ((a * 461) >> 10) + slide, cy - ((b * 82) >> 10), s, stroke_for(s, 922 + ((1331 * g) >> 10)), stroke);
         }
-        const i32 room = half - 2 * unit;
-        if (room < unit) { hide(frame, first + i); continue; }
-        const i32 length = ((((2 * room) >> 4) * s[2] >> 6) >> 4) * grown >> 6;
-        if (length < unit) { hide(frame, first + i); continue; }
-        const i32 x = ((room - (length >> 1)) >> 4) * s[1] >> 6;
-        const i32 scale = clamp(length >> 5, SMALLEST, 2 * unit);
-        place(frame, first + i, cx + x, cy + y, scale, stroke_for(scale, (1434 * s[4]) >> 10), stroke);
-        turn(frame, first + i, rotation(900 + s[3]));
+    }
+    // a thinner stripe beside it, higher and shorter: 0.6 px
+    {
+        const i32 g = grown(256);
+        const i32 length = ((((2 * straight_part) >> 4) * 451 >> 6) >> 4) * g >> 6;
+        if (length < 2 * unit) hide(frame, first + 1);
+        else {
+            const i32 s = clamp(length >> 6, SMALLEST, 2 * unit);
+            place(frame, first + 1, cx - ((a * 205) >> 10) + ((slide * 614) >> 10), cy - ((b * 205) >> 10), s, stroke_for(s, 614), stroke);
+        }
+    }
+    // the glint: a quarter round inside the top-left corner, 1.2 .. 2 px
+    {
+        const i32 g = grown(154);
+        const i32 radius = clamp((r * 635) >> 10, 5 * unit / 2, 16 * unit);
+        const i32 in = radius + (radius >> 2) + 3 * unit / 2;
+        const i32 s = (((radius >> 3) >> 4) * g) >> 6;
+        if (s < SMALLEST || in > a || in > b) hide(frame, first + 2);
+        else {
+            place(frame, first + 2, cx - a + in + (slide >> 1), cy - b + in, s, stroke_for(s, 1229 + ((819 * g) >> 10)), stroke);
+        }
+    }
+    // the rim light: a thin quarter round inside the bottom-right corner, 0.55 px
+    {
+        const i32 g = grown(461);
+        const i32 radius = clamp((r * 717) >> 10, 3 * unit, 16 * unit);
+        const i32 in = radius + (radius >> 2) + 3 * unit / 2;
+        const i32 s = (((radius >> 3) >> 4) * g) >> 6;
+        if (s < SMALLEST || in > a || in > b) hide(frame, first + 3);
+        else {
+            place(frame, first + 3, cx + a - in - (slide >> 1), cy + b - in, s, stroke_for(s, 563), stroke);
+            turn(frame, first + 3, rotation(1800));
+        }
+    }
+    // the reflection: a short thin stripe down the right, low, 0.5 px
+    {
+        const i32 g = grown(614);
+        const i32 length = (((straight_part >> 4) * 922 >> 6) >> 4) * g >> 6;
+        if (length < 2 * unit) hide(frame, first + 4);
+        else {
+            const i32 s = clamp(length >> 5, SMALLEST, 2 * unit);
+            place(frame, first + 4, cx + ((a * 563) >> 10) - ((slide * 307) >> 10), cy + ((b * 256) >> 10), s, stroke_for(s, 512), stroke);
+        }
     }
 }
 
@@ -347,7 +369,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         spread += bend > 0 ? ((cube - spread) * bend) >> 10 : ((ease - spread) * -bend) >> 10;
     }
     const i32 st = exp2_wide(((2 * spread - unit) * 2 * lab_setting(input, SPACE_DEPTH_SET, SPACE_DEPTH)) >> 10);
-    const i32 metal = driven(input, TEXTURE);                           // Q10: how much texture, 0 .. 1
+    const i32 shine = driven(input, CHROME);                            // Q10: how much chrome, 0 .. 1
     const i32 a0 = 8 * unit + driven(input, WIDTH) * 10;                // half width 8 .. 18 pixels
     const i32 peak = driven(input, TALLEST_RING) * 5;                   // the tallest mode, 0 .. 5, Q10
     const i32 square = driven(input, SHAPE);                            // round at 0, square at 1
@@ -383,8 +405,9 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         const i32 ly = MIDDLE_Y * unit + bobbed[5 - k], ry = MIDDLE_Y * unit + bobbed[6 + k];
         ring(frame, (2 * k) * PIECES, lx, ly, a, b, r, width);
         ring(frame, (2 * k + 1) * PIECES, rx, ry, a, b, r, width);
-        texture(frame, (2 * k) * PIECES + 10, lx, ly, a, b, r, metal);
-        texture(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, r, metal);
+        // the highlights slide against the ring's motion: its push along the chain, and its pulse
+        chrome(frame, (2 * k) * PIECES + 10, lx, ly, a, b, r, shine, -(state.speed[5 - k] >> 7) - 3 * sway);
+        chrome(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, r, shine, -(state.speed[6 + k] >> 7) + 3 * sway);
     }
 }
 } // namespace metal
