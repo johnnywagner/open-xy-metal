@@ -45,6 +45,7 @@ struct Voice {
     i32 lch[MODES];          // log2 cos(th / 2), Q24
     i32 b[MODES];            // drive into each mode, Q31
     i32 sn[MODES];           // sin th, Q31
+    i32 lim[MODES];          // hot's limit on (A sin th / 2)^2, Q31 (engine.cpp)
     i32 edge[MODES];         // fade near 20 Hz and the top, Q31
     i32 wk[MODES];           // MODES' feed per mode, Q31
     i32 leps[MODES];         // log2 sqrt(1 + eps), Q24
