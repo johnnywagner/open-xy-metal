@@ -1,4 +1,4 @@
-// rings' page: the eight modes as circles, spaced by their ratio to the note (STRETCH spreads or squeezes them),
+// rings' page: the six modes as circles, spaced by their ratio to the note (STRETCH spreads or squeezes them),
 // lit by how much MODES feeds each; at each note a halo rings out of every fed mode and fades with that mode's ring
 // time. Below, the DROP: the pitch falling from its start offset onto the note, over its time. Screen work only.
 #include "display.h"
@@ -49,12 +49,12 @@ void digits(char* out, u32 capacity, i32 value, int decimals, bool sign) {
     copy(out, capacity, text);
 }
 
-// The captions: DROP 0..100, RATIO 0.00..1.00, STRETCH -100..+100, MODES 1.0..8.0.
+// The captions: DROP 0..100, RATIO 0.00..1.00, STRETCH -100..+100, MODES 1.0..6.0.
 void captions(Frame& frame, const Input& input) {
     const i32 drop = (fraction(input.parameters[0]) * 100 + 512) >> 10;
     const i32 ratio = (fraction(input.parameters[1]) * 100 + 512) >> 10;
     const i32 stretch = ((fraction(input.parameters[2]) * 200 + 512) >> 10) - 100;
-    const i32 modes = 10 + ((fraction(input.parameters[3]) * 70 + 512) >> 10);
+    const i32 modes = 10 + ((fraction(input.parameters[3]) * 50 + 512) >> 10);
     digits(frame.header[0], sizeof frame.header[0], drop, 0, false);
     digits(frame.header[1], sizeof frame.header[1], ratio, 2, false);
     digits(frame.header[2], sizeof frame.header[2], stretch, 0, stretch != 0);
@@ -114,9 +114,10 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
 
     // the modes: x by log2 of the ratio, STRETCH as 2^(2 x - 1) on the material's log2 ratio (engine.cpp, set_stretch)
     const i32 st = exp2_q10(fraction(input.parameters[2]) * 2 - unit);
-    const i32 modes7 = fraction(input.parameters[3]) * 7;   // Q10: mode k is fed clamp(1 + 7x - k, 0, 1)
-    for (u32 k = 0; k < 8; ++k) {
-        const i32 fed = k == 0 ? unit : clamp(modes7 - static_cast<i32>(k - 1) * unit, 0, unit);
+    const i32 modes5 = fraction(input.parameters[3]) * 5;   // Q10: mode k is fed clamp(1 + 5x - k, 0, 1)
+    for (u32 k = 6; k < 8; ++k) { hide(frame, 1 + k); hide(frame, 9 + k); }   // the artwork has eight circles; six are used
+    for (u32 k = 0; k < 6; ++k) {
+        const i32 fed = k == 0 ? unit : clamp(modes5 - static_cast<i32>(k - 1) * unit, 0, unit);
         const i32 lrr = (DISPLAY_L_RM[k] * st) >> 10;         // Q10 octaves
         const i32 x = clamp(96 * unit + lrr * 42, 0, 290 * unit);   // 42 px per octave, the note at 96
         const i32 size = unit + 640 - static_cast<i32>(k) * 72;
