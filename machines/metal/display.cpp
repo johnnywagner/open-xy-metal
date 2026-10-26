@@ -9,7 +9,8 @@
 // left and right ends in turn) and the push travels along ring by ring, each wiggling on its own spring as it
 // passes, bouncing back off the far end. And each ring pulses, wider and narrower and out and in, at a rate that
 // rises with its mode and dies away with its ring time. And each ring can bob up and down on its own, each at its own
-// rate: on every note (dying away), or all the time; how deep, on a knob or not. Screen work only (screen v6).
+// rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can fill the rings with
+// a metal texture, streaks like brushed steel coming in one by one across a knob. Screen work only (screen v7).
 #include "display.h"
 #include "display_tables.h"
 
@@ -24,15 +25,16 @@ const i32 SWING_DONE = 8192;           // Q10 seconds: a swing older than this i
 const i32 TALL = 88;                   // the tallest ring's half height at rest, pixels
 const i32 TALLEST = 95;                // half the drawing's height
 // The browser lab (never the OP-XY, which leaves parameter slots 4 to 7 at 0) tunes the motions and reassigns the
-// knobs through those slots. Each setting is an 11-bit field, 0 for the value here, else 1 + a Q10 fraction; each
-// assignment a 3-bit field, 0 for the one here, else the knob 1 .. 4, or 5 for none (the knob's default value; for
-// the chain and the pulse, their whole amount).
-//   slot 4: kick (bits 0-10), pass-along (11-21), assignments of SPACING, WIDTH, TALLEST_RING (22-30)
-//   slot 5: wiggle, ring-out, assignments of SHAPE, STANDING, STRIKE_SIZE
-//   slot 6: pulse, jolt, assignments of CHAIN_AMOUNT, PULSE_AMOUNT, BOB
-//   slot 7: bob depth (0-10), bob speed (11-21), bob on notes (22-23: 0 as here, 1 all the time, 2 on notes)
-enum Drive { SPACING, WIDTH, TALLEST_RING, SHAPE, STANDING, STRIKE_SIZE, CHAIN_AMOUNT, PULSE_AMOUNT, BOB };
-const u32 KNOB_OF[9] = {3, 2, 2, 4, 4, 1, 5, 5, 5};   // each drive's knob (1 DROP, 2 RATIO, 3 STRETCH, 4 MODES, 5 none)
+// knobs through those slots, read as one stream of bits, 31 to a slot from slot 4's lowest:
+//   bits 0-79: ten settings of 8 bits (Setting below), each 0 for the value here, else 1 + 254ths of the range;
+//   bits 80-119: ten assignments of 4 bits (Drive below): bits 0-2 are 0 for the knob here, else the knob 1 .. 4,
+//     or 5 for none (the knob's default value; the whole amount for the chain, pulse and bob; no texture); bit 3
+//     inverts the knob;
+//   bits 120-121: the bob, 0 as here, 1 all the time, 2 on notes.
+enum Setting { KICK_SET, PASS_SET, WIGGLE_SET, RINGOUT_SET, PULSE_SET, JOLT_SET, BOB_DEPTH_SET, BOB_SPEED_SET,
+               SPACE_DEPTH_SET, SPACE_CURVE_SET };
+enum Drive { SPACING, WIDTH, TALLEST_RING, SHAPE, STANDING, STRIKE_SIZE, CHAIN_AMOUNT, PULSE_AMOUNT, BOB, TEXTURE };
+const u32 KNOB_OF[10] = {3, 2, 2, 4, 4, 1, 5, 5, 5, 5};   // each drive's knob (1 DROP, 2 RATIO, 3 STRETCH, 4 MODES, 5 none)
 const i32 KNOB_REST[4] = {0, 91, 1023, 205};       // Q10: each knob's default, for a drive with no knob
 const i32 KICK = 807;                  // Q10: the kick, 600 x pixels a second (473)
 const i32 PASS = 436;                  // Q10: the coupling to each neighbour, 30 x 2^(6 x) per s^2 (176)
@@ -40,15 +42,32 @@ const i32 WIGGLE = 742;                // Q10: each ring's own spring, 4 x Hz (2
 const i32 RINGOUT = 59;                // Q10: the chain's decay, 0.25 x 24^x s to 1/e (0.3 s)
 const i32 PULSE = 512;                 // Q10: the pulse, 0.7 x wider and narrower (35 %), and 6 x pixels out and in
 const i32 JOLT = 512;                  // Q10: the strike's size change, 2 x as much as DROP's pitch (1 x)
-const i32 BOB_DEPTH = 512;             // Q10: the bob, 24 x pixels either way (12)
-const i32 BOB_SPEED = 512;             // Q10: its rate, 0.2 x 10^x Hz (0.63 Hz), each ring a little off it
+const i32 BOB_DEPTH = 256;             // Q10: the bob, 48 x pixels either way (12)
+const i32 BOB_SPEED = 460;             // Q10: its rate, 0.1 x 60^x Hz (0.63 Hz), each ring a little off it
+const i32 SPACE_DEPTH = 512;           // Q10: how far the spacing moves with its knob, 2 x as far as STRETCH (1 x)
+const i32 SPACE_CURVE = 512;           // Q10: its knob's curve, 2 x - 1: slow to start below 0, fast above (even)
 const bool BOB_ON_NOTES = true;        // on each note, dying away; else all the time
 const i32 BOB_FADE_INV = 410;          // Q10 per second: a note's bob dies away over 2.5 s, squared
 // Each ring's own bob rate, Q10 of the speed, so no two move together.
 const i32 BOB_RATE[12] = {1024, 851, 1198, 932, 1116, 788, 1260, 973, 1075, 891, 1157, 819};
 const i32 CHAIN_MOST = 40;             // pixels: no ring is pushed further
 const i32 CHAIN_FASTEST = 1000;        // pixels a second: nor moves faster
-const i32 PIECES = 10;                 // nodes per ring
+const i32 PIECES = 20;                 // nodes per ring: the ring's 10 pieces, then 10 streaks of texture
+// The texture's streaks, in each ring: height (Q10 of the ring's inside, up), place across (Q10 of the room either
+// side), length (Q10 of the width there), turn from level (tenths of a degree), stroke (Q10 of 1.4 px) and when it
+// comes in (in tenths of the knob).
+const i32 STREAK[10][6] = {
+    {-839, -380, 364, 8, 358, 8},
+    {-711, 68, 347, 27, 358, 3},
+    {-443, 174, 695, -38, 1331, 1},
+    {-285, -600, 454, 26, 512, 4},
+    {-119, -474, 386, -6, 1331, 7},
+    {130, -425, 694, 36, 512, 0},
+    {280, 64, 349, -38, 1331, 9},
+    {459, 240, 592, -5, 1024, 6},
+    {694, -62, 507, -22, 512, 2},
+    {838, -266, 637, -2, 1024, 5},
+};
 // The palette: white strokes 0.375 px x 1.284^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale s takes the
 // widest entry within 1.133 of the width it should show divided by s, so every piece shows within 12 % of it.
 const i32 WIDTHS[16] = {384, 493, 633, 813, 1044, 1340, 1721, 2209, 2837, 3643, 4677, 6005, 7711, 9901, 12713, 16323};
@@ -161,20 +180,75 @@ inline void display_reset(DisplayState& state) {
     for (u32 j = 0; j < 12; ++j) state.bob[j] = static_cast<u32>(j) * 0x6ED9EBA1u;   // each ring somewhere else
 }
 
-// A lab setting (an 11-bit field of slot `slot` at `shift`), or `fallback`. Q10.
-inline i32 lab_setting(const Input& input, u32 slot, u32 shift, i32 fallback) {
-    const u32 field = (static_cast<u32>(input.slots[slot]) >> shift) & 2047;
-    return field ? static_cast<i32>(field) - 1 : fallback;
+// `width` bits of the lab's stream from bit `at` (slots 4 to 7, 31 bits each).
+inline u32 lab_bits(const Input& input, u32 at, u32 width) {
+    const u32 slot = 4 + at / 31, shift = at % 31;
+    u32 bits = static_cast<u32>(input.slots[slot]) >> shift;
+    if (shift + width > 31 && slot < 7) bits |= static_cast<u32>(input.slots[slot + 1]) << (31 - shift);
+    return bits & ((1u << width) - 1);
 }
-// What drives `drive`, Q10: its knob's value, its knob's default when it has none (the whole amount for the chain,
-// the pulse and the bob), whichever the lab assigns.
+// A lab setting, Q10, or `fallback`.
+inline i32 lab_setting(const Input& input, Setting setting, i32 fallback) {
+    const u32 field = lab_bits(input, 8 * setting, 8);
+    return field ? static_cast<i32>((field - 1) * 4124) >> 10 : fallback;    // 254ths, as Q10
+}
+// What drives `drive`, Q10: its knob's value (inverted if the lab says), its knob's default when it has none (the
+// whole amount for the chain, the pulse and the bob; none of the texture), whichever the lab assigns.
 inline i32 driven(const Input& input, Drive drive) {
-    const u32 slot = 4 + drive / 3, shift = 22 + 3 * (drive % 3);
-    const u32 field = (static_cast<u32>(input.slots[slot]) >> shift) & 7;
-    const u32 knob = field >= 1 && field <= 5 ? field : KNOB_OF[drive];
-    if (knob <= 4) return fraction(input.parameters[knob - 1]);
+    const u32 field = lab_bits(input, 80 + 4 * drive, 4);
+    const u32 knob = (field & 7) >= 1 && (field & 7) <= 5 ? field & 7 : KNOB_OF[drive];
+    if (knob <= 4) {
+        const i32 value = fraction(input.parameters[knob - 1]);
+        return field & 8 ? unit - 1 - value : value;
+    }
+    if (drive == TEXTURE) return 0;
     if (drive >= CHAIN_AMOUNT) return unit;
     return KNOB_REST[KNOB_OF[drive] - 1];
+}
+
+// 2^e for e in [-2, 2] (Q10).
+inline i32 exp2_wide(i32 e) {
+    e = clamp(e, -2 * unit, 2 * unit);
+    return e > unit ? exp2_q10(e - unit) << 1 : e < -unit ? exp2_q10(e + unit) >> 1 : exp2_q10(e);
+}
+
+// Integer square root.
+inline u32 root(u32 v) {
+    u32 r = 0;
+    for (u32 bit = 1u << 30; bit; bit >>= 2) {
+        if (v >= r + bit) { v -= r + bit; r = (r >> 1) + bit; }
+        else r >>= 1;
+    }
+    return r;
+}
+
+// The texture in one ring (centre cx, cy; half width a, half height b, corner radius r): its streaks, each shown
+// once `shown` (Q10 of the knob, 0 .. 1) passes its tenth, growing in over that tenth. Each lies inside the ring
+// 2 px clear of its outline, across the ring's width at its height.
+template <class F>
+void texture(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 shown) {
+    const i32 inside = b - 2 * unit;
+    for (u32 i = 0; i < 10; ++i) {
+        const i32* s = STREAK[i];
+        const i32 grown = clamp((shown - s[5] * 102) * 10, 0, unit);   // Q10: comes in over its tenth
+        if (grown <= 0 || inside <= 0) { hide(frame, first + i); continue; }
+        const i32 y = (inside >> 4) * s[0] >> 6;
+        // the ring's half width at y: a, less the round of a corner
+        i32 half = a;
+        const i32 into = (y < 0 ? -y : y) - (b - r);
+        if (into > 0) {
+            const u32 r4 = static_cast<u32>(r >> 6), d4 = static_cast<u32>(clamp(into, 0, r) >> 6);   // Q4 pixels
+            half = a - r + (static_cast<i32>(root(r4 * r4 - d4 * d4)) << 6);
+        }
+        const i32 room = half - 2 * unit;
+        if (room < unit) { hide(frame, first + i); continue; }
+        const i32 length = ((((2 * room) >> 4) * s[2] >> 6) >> 4) * grown >> 6;
+        if (length < unit) { hide(frame, first + i); continue; }
+        const i32 x = ((room - (length >> 1)) >> 4) * s[1] >> 6;
+        const i32 scale = clamp(length >> 5, SMALLEST, 2 * unit);
+        place(frame, first + i, cx + x, cy + y, scale, stroke_for(scale, (1434 * s[4]) >> 10), stroke);
+        turn(frame, first + i, rotation(900 + s[3]));
+    }
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -183,19 +257,19 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const bool snapshot = !state.initialized || state.track != input.track;
     const bool still = snapshot || input.reduced_motion;
     // the motions' settings: the lab's, or the ones above
-    const u32 bob_mode = (static_cast<u32>(input.slots[7]) >> 22) & 3;
+    const u32 bob_mode = lab_bits(input, 120, 2);
     const bool on_notes = bob_mode ? bob_mode == 2 : BOB_ON_NOTES;
-    const i32 bob_depth = (((24 * lab_setting(input, 7, 0, BOB_DEPTH)) >> 4) * driven(input, BOB)) >> 6;   // Q10 px
-    const i32 bob_speed = (205 * exp2_up((3402 * lab_setting(input, 7, 11, BOB_SPEED)) >> 10)) >> 10;     // Hz, Q10
-    const i32 kick = ((600 * lab_setting(input, 4, 0, KICK)) >> 10) * driven(input, CHAIN_AMOUNT);   // Q10 px/s
-    const i32 pass = (30 * exp2_up(6 * lab_setting(input, 4, 11, PASS))) >> 10;                     // per s^2
-    const i32 wiggle = 4 * lab_setting(input, 5, 0, WIGGLE);                                        // Hz, Q10
-    const i32 own = ((((wiggle * wiggle) >> 10) * 40426) >> 20);                                    // (2 pi f)^2
-    const i32 fall = (4695 * lab_setting(input, 5, 11, RINGOUT)) >> 10;                             // x log2 24
+    const i32 bob_depth = (((48 * lab_setting(input, BOB_DEPTH_SET, BOB_DEPTH)) >> 4) * driven(input, BOB)) >> 6;  // Q10 px
+    const i32 bob_speed = (102 * exp2_up((6049 * lab_setting(input, BOB_SPEED_SET, BOB_SPEED)) >> 10)) >> 10;    // Hz, Q10
+    const i32 kick = ((600 * lab_setting(input, KICK_SET, KICK)) >> 10) * driven(input, CHAIN_AMOUNT);   // Q10 px/s
+    const i32 pass = (30 * exp2_up(6 * lab_setting(input, PASS_SET, PASS))) >> 10;                     // per s^2
+    const i32 wiggle = 4 * lab_setting(input, WIGGLE_SET, WIGGLE);                                     // Hz, Q10
+    const i32 own = ((((wiggle * wiggle) >> 10) * 40426) >> 20);                                       // (2 pi f)^2
+    const i32 fall = (4695 * lab_setting(input, RINGOUT_SET, RINGOUT)) >> 10;                          // x log2 24
     const i32 whole = fall > unit ? (fall + unit - 1) >> 10 : 1;
     const i32 damp = exp2_q10((whole << 10) - fall - unit) >> (whole - 1);            // 4 x 24^-x per s, Q8
-    const i32 pulse = (lab_setting(input, 6, 0, PULSE) * driven(input, PULSE_AMOUNT)) >> 10;         // Q10
-    const i32 jolt = 2 * lab_setting(input, 6, 11, JOLT);                                           // Q10
+    const i32 pulse = (lab_setting(input, PULSE_SET, PULSE) * driven(input, PULSE_AMOUNT)) >> 10;       // Q10
+    const i32 jolt = 2 * lab_setting(input, JOLT_SET, JOLT);                                           // Q10
     if (still) {
         for (u32 k = 0; k < 6; ++k) state.ages[k] = SWING_DONE;
         state.drop_age = SWING_DONE;
@@ -263,7 +337,17 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         }
     }
 
-    const i32 st = exp2_q10(driven(input, SPACING) * 2 - unit);         // as STRETCH on the modes' log2 ratios
+    // SPACING, as STRETCH on the modes' log2 ratios: its knob through the curve (cubic, slow to start or fast),
+    // then 2^((2 x - 1) depth), depth 0 .. 2
+    i32 spread = driven(input, SPACING);
+    {
+        const i32 bend = 2 * lab_setting(input, SPACE_CURVE_SET, SPACE_CURVE) - unit;      // -1 .. 1
+        const i32 cube = (((spread * spread) >> 10) * spread) >> 10;
+        const i32 rest = unit - spread, ease = unit - ((((rest * rest) >> 10) * rest) >> 10);
+        spread += bend > 0 ? ((cube - spread) * bend) >> 10 : ((ease - spread) * -bend) >> 10;
+    }
+    const i32 st = exp2_wide(((2 * spread - unit) * 2 * lab_setting(input, SPACE_DEPTH_SET, SPACE_DEPTH)) >> 10);
+    const i32 metal = driven(input, TEXTURE);                           // Q10: how much texture, 0 .. 1
     const i32 a0 = 8 * unit + driven(input, WIDTH) * 10;                // half width 8 .. 18 pixels
     const i32 peak = driven(input, TALLEST_RING) * 5;                   // the tallest mode, 0 .. 5, Q10
     const i32 square = driven(input, SHAPE);                            // round at 0, square at 1
@@ -292,11 +376,15 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         // (and room left above and below for the bob)
         const i32 b = clamp((((TALL * size) >> 4) * grow) >> 6, a, TALLEST * unit - bob_depth);
         const i32 r = clamp((((a < b ? a : b) >> 4) * (unit - square)) >> 6, 0, 16 * unit);
-        const i32 x = out + 6 * sway;                                   // the tines: out and in, up to 6 px
+        const i32 x = clamp(out + 6 * sway, 0, 260 * unit);             // the tines: out and in, up to 6 px
         // the chain runs left to right: the left rings from mode 5 in to mode 0, then the right from 0 out to 5
         const i32 left_at = state.at[5 - k], right_at = state.at[6 + k];
-        ring(frame, (2 * k) * PIECES, MIDDLE_X * unit - x + left_at, MIDDLE_Y * unit + bobbed[5 - k], a, b, r, width);
-        ring(frame, (2 * k + 1) * PIECES, MIDDLE_X * unit + x + right_at, MIDDLE_Y * unit + bobbed[6 + k], a, b, r, width);
+        const i32 lx = MIDDLE_X * unit - x + left_at, rx = MIDDLE_X * unit + x + right_at;
+        const i32 ly = MIDDLE_Y * unit + bobbed[5 - k], ry = MIDDLE_Y * unit + bobbed[6 + k];
+        ring(frame, (2 * k) * PIECES, lx, ly, a, b, r, width);
+        ring(frame, (2 * k + 1) * PIECES, rx, ry, a, b, r, width);
+        texture(frame, (2 * k) * PIECES + 10, lx, ly, a, b, r, metal);
+        texture(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, r, metal);
     }
 }
 } // namespace metal
