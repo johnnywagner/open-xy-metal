@@ -9,10 +9,10 @@
 // left and right ends in turn) and the push travels along ring by ring, each wiggling on its own spring as it
 // passes, bouncing back off the far end. And each ring pulses, wider and narrower and out and in, at a rate that
 // rises with its mode and dies away with its ring time. And each ring can bob up and down on its own, each at its own
-// rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can give the rings a
-// metal sheen across a knob: a stripe down the left and a glint in the top-left corner, lit from the top left, that
-// brighten from the OP-XY's dark grey through its mid and light greys to white as the knob rises, with a dim rim at
-// the bottom right; they slide against the ring's motion. Screen work only (screen v10).
+// rate: on every note (dying away), or all the time; how deep, on a knob or not. And the lab can fill the rings with
+// a radial gradient across a knob: white at the centre through the OP-XY's greys to its darkest, in five steps (the
+// screen draws flat colours only), growing from the centre until it fills the ring's width, breathing with its pulse.
+// Screen work only (screen v11).
 #include "display.h"
 #include "display_tables.h"
 
@@ -54,7 +54,7 @@ const i32 BOB_FADE_INV = 410;          // Q10 per second: a note's bob dies away
 const i32 BOB_RATE[12] = {1024, 851, 1198, 932, 1116, 788, 1260, 973, 1075, 891, 1157, 819};
 const i32 CHAIN_MOST = 40;             // pixels: no ring is pushed further
 const i32 CHAIN_FASTEST = 1000;        // pixels a second: nor moves faster
-const i32 PIECES = 19;                 // nodes per ring: the ring's 10 pieces, then the sheen's 9 (gen_panel.py)
+const i32 PIECES = 15;                 // nodes per ring: the ring's 10 pieces, then the gradient's 5 discs
 // The palette: white strokes 0.375 px x 1.284^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale s takes the
 // widest entry within 1.133 of the width it should show divided by s, so every piece shows within 12 % of it.
 const i32 WIDTHS[16] = {384, 493, 633, 813, 1044, 1340, 1721, 2209, 2837, 3643, 4677, 6005, 7711, 9901, 12713, 16323};
@@ -209,38 +209,20 @@ inline u32 root(u32 v) {
     return r;
 }
 
-// The sheen on one ring (centre cx, cy; half width a, half height b; Q10 pixels), as much as `shine` (Q10, 0 .. 1).
-// Its pieces: the stripe in dark grey, mid grey, light grey and white, the glint in the same four, then the rim. The
-// greys and widths are the artwork's (drawn with paint kept); each piece is sized to the ring's width, so it keeps
-// its look on every ring. Across the knob, each quarter brings in the next colour, growing from nothing over the
-// last, which then goes; so the sheen brightens from dark grey to white. `slide` (Q10 pixels) moves it against the
-// ring's motion.
+// The gradient in one ring (centre cx, cy; half width a, half height b; Q10 pixels), as much as `fill` (Q10, 0 .. 1):
+// five discs, one over the next, the artwork's circles of radius 16, 12.8, 9.6, 6.4 and 3.2 px filled from the
+// OP-XY's darkest grey to white, all at one scale, so their steps keep the same proportions. Its radius grows with the
+// knob up to the ring's half width (or half height, if less), less 2 px; `breath` (Q10, -1 .. 1) swells it with the
+// ring's pulse, and `slide` (Q10 pixels) moves it against the ring's motion.
 template <class F>
-void chrome(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 shine, i32 slide) {
-    const i32 rise = clamp(shine, 0, unit) * 4;                      // Q10: 0 .. 4 colours
-    const i32 stage = rise >> 10, part = rise & (unit - 1);           // the colour coming in, and how far
-    slide = clamp(slide, -(a >> 2), a >> 2);
-    // the stripe: 32 px x a / 12, no longer than 0.75 of the inside, 0.45 of the way out to the left
-    const i32 stripe = clamp((a * 85) >> 10, 0, ((b - 2 * unit) * 48) >> 10);
-    // the glint: radius a / 2, set in from the top-left corner
-    const i32 glint = (a * 64) >> 10;                                 // its scale: radius 8 x this
-    const i32 in = (a >> 1) + (a >> 3) + 3 * unit / 2;
-    const bool glint_fits = in < a && in < b;
-    for (i32 colour = 0; colour < 4; ++colour) {
-        const i32 grown = colour < stage - 1 || colour > stage ? 0 : colour == stage - 1 ? unit : part;
-        const i32 s1 = (stripe * grown) >> 10;
-        if (s1 < 40) hide(frame, first + colour);
-        else place(frame, first + colour, cx - ((a * 461) >> 10) + slide, cy - ((b * 102) >> 10), clamp(s1, 1, 2 * unit), 0, keep);
-        const i32 s2 = (glint * grown) >> 10;
-        if (s2 < 40 || !glint_fits) hide(frame, first + 4 + colour);
-        else place(frame, first + 4 + colour, cx - a + in + (slide >> 1), cy - b + in, clamp(s2, 1, 2 * unit), 0, keep);
-    }
-    // the rim: dim, in the bottom-right corner, once the sheen is a quarter in
-    if (rise < unit || !glint_fits) hide(frame, first + 8);
-    else {
-        place(frame, first + 8, cx + a - in - (slide >> 1), cy + b - in, clamp(glint, 1, 2 * unit), 0, keep);
-        turn(frame, first + 8, rotation(1800));
-    }
+void chrome(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 fill, i32 breath, i32 slide) {
+    const i32 most = (a < b ? a : b) - 2 * unit;
+    i32 radius = (((most >> 4) * clamp(fill, 0, unit)) >> 6);
+    radius += ((radius >> 4) * ((breath * 154) >> 10)) >> 6;          // +/- 15 % with the pulse
+    const i32 scale = radius >> 4;                                    // the outer disc is 16 px
+    if (most <= 0 || scale < 40) { for (u32 i = 0; i < 5; ++i) hide(frame, first + i); return; }
+    slide = clamp(slide, -(a >> 3), a >> 3);
+    for (u32 i = 0; i < 5; ++i) place(frame, first + i, cx + slide, cy, clamp(scale, 1, 2 * unit), 0, keep);
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -339,7 +321,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         spread += bend > 0 ? ((cube - spread) * bend) >> 10 : ((ease - spread) * -bend) >> 10;
     }
     const i32 st = exp2_wide(((2 * spread - unit) * 2 * lab_setting(input, SPACE_DEPTH_SET, SPACE_DEPTH)) >> 10);
-    const i32 shine = driven(input, CHROME);                            // Q10: how much sheen, 0 .. 1
+    const i32 shine = driven(input, CHROME);                            // Q10: how much gradient, 0 .. 1
     const i32 a0 = 8 * unit + driven(input, WIDTH) * 10;                // half width 8 .. 18 pixels
     const i32 peak = driven(input, TALLEST_RING) * 5;                   // the tallest mode, 0 .. 5, Q10
     const i32 square = driven(input, SHAPE);                            // round at 0, square at 1
@@ -376,8 +358,8 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         ring(frame, (2 * k) * PIECES, lx, ly, a, b, r, width);
         ring(frame, (2 * k + 1) * PIECES, rx, ry, a, b, r, width);
         // the highlights slide against the ring's motion: its push along the chain, and its pulse
-        chrome(frame, (2 * k) * PIECES + 10, lx, ly, a, b, shine, -(state.speed[5 - k] >> 7) - 3 * sway);
-        chrome(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, shine, -(state.speed[6 + k] >> 7) + 3 * sway);
+        chrome(frame, (2 * k) * PIECES + 10, lx, ly, a, b, shine, sway, -(state.speed[5 - k] >> 8));
+        chrome(frame, (2 * k + 1) * PIECES + 10, rx, ry, a, b, shine, sway, -(state.speed[6 + k] >> 8));
     }
 }
 } // namespace metal
