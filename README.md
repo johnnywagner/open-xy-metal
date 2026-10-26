@@ -62,17 +62,15 @@ against the kit's renders):
 ## Level
 
 The band after the modes carries the output gain: 12 dB above the brief's level (which was 13 dB under 2op FM), and
-`BOOST_DB` (8 dB) more into a soft knee at the very end. The knee leaves the signal alone up to 6 dB under the SDK's
-half-scale ceiling (-6 dBFS), then bends it onto the ceiling (a quadratic, reaching it with slope 0 at 1.5 times the
-ceiling). There is not 8 dB of clean headroom: before the boost the strike's first transient already reached -7 to
--12 dBFS, and at the loudest settings the ceiling. With the knee, held notes come out 7 to 8 dB louder and the first
-100 ms 5.5 to 8 dB louder. What the knee adds, against an unbent +8 dB:
+`BOOST_DB` (3 dB) more into a soft knee at the very end: unchanged up to 3/4 of the SDK's half-scale ceiling
+(-6 dBFS), then bent onto the ceiling (a quadratic, reaching it with slope 0 at 5/4 of it). Held notes come out 3 dB
+louder than before the boost.
 
-- the default sound and most settings: -30 to -55 dB in the body, -11 to -30 dB in the first 100 ms (the strike's
-  peaks, compressed);
-- the loudest (RATIO 1, STRETCH -100, MODES 8): -16 to -29 dB in the body, an audible saturation.
-
-`BOOST_DB` in `tools/gen_tables.py` sets it; 0 restores the earlier level exactly, unbent.
+There is no more clean headroom than that: the strike's first peaks already reach -9 to -6 dBFS at most settings. An
+8 dB boost with the knee from half the ceiling (tried, and heard as gritty) put 7 to 15 dB more energy between the
+partials; at 3 dB with this knee the default sounds and most settings are within about 1 dB of no boost at all, and
+only the loudest (RATIO 1, STRETCH -100, MODES 8, low notes) bends its first transient. For more level, turn the
+track up on the OP-XY. `BOOST_DB` in `tools/gen_tables.py` sets the boost; 0 restores the earlier level exactly.
 
 ## How it was checked
 

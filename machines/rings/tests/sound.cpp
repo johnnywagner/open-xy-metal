@@ -211,15 +211,15 @@ static void modal_block_v(rings_t* v, float* x)
     for (int n = 0; n < STEPV; ++n) x[n] = dry * x[n] + mix * y[n];
 }
 // The half-band to the output rate (engine.cpp): two paths of first-order allpasses on half the voice's output.
-static const double BOOSTED_D = 2.5118864315095801;   // +8 dB (tools/gen_tables.py, BOOST_DB)
+static const double BOOSTED_D = 1.4125375446227544;   // +3 dB (tools/gen_tables.py, BOOST_DB)
 static double hb_state[5];
-// The boost's soft knee (engine.cpp, knee), on the boosted output: unchanged to a quarter of full scale, then bending
-// onto the half-scale ceiling at three quarters.
+// The boost's soft knee (engine.cpp, knee), on the boosted output: unchanged to 3/4 of the half-scale ceiling, then
+// bending onto it at 5/4 of it.
 static double knee_d(double x)
 {
-    const double z = x / 4, a = fabs(z), k = 1.0 / 16;
+    const double z = x / 4, a = fabs(z), k = 3.0 / 32, w = 1.0 / 32;
     if (a <= k) return x;
-    const double d = a - k, y = d >= 2 * k ? 0.5 : 4 * (a - 4 * d * d);
+    const double d = a - k, y = d >= 2 * w ? 0.5 : 4 * (a - d * d / (4 * w));
     return z < 0 ? -y : y;
 }
 // The machine's whole block (engine.cpp) on the reference's state, in double precision, with its stages in the
@@ -299,7 +299,7 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
 namespace {
 
 const double GAIN = 143.0 * 3.9810717055349722;   // the machine's band gain against the reference page's: 143, +12 dB
-const double BOOSTED = 2.5118864315095801;         // and the boost after it, +8 dB (engine.cpp, knee)
+const double BOOSTED = 1.4125375446227544;         // and the boost after it, +3 dB (engine.cpp, knee)
 const opxy::i32 DECLARED_PEAK = 1073741823;  // definition.json outputPeakQ31 (half scale; the engine clips there)
 
 struct Setting { const char* name; int note; double drop, ratio, stretch, modes; };

@@ -45,10 +45,11 @@ MODE_HASH = [0.31, -0.83, 0.62, -0.17, 0.94, -0.55, 0.08, -0.71]
 # clips at half scale, which only the loudest settings' first transient reaches.
 LEVEL_DB = 12.0
 OUT_GAIN = 143.0 * 10 ** (LEVEL_DB / 20)
-# BOOST_DB more (in the band's gain), into a soft knee past the half-band: unchanged up to 6 dB under the half-scale
-# ceiling, then bending (a quadratic, slope 1 to 0) onto it at 1.5 x the ceiling; above, the ceiling. Peaks (mostly the
-# strike's first transient) bend; the body seldom reaches the knee.
-BOOST_DB = 8.0
+# BOOST_DB more (in the band's gain), into a soft knee past the half-band: unchanged up to 3/4 of the half-scale
+# ceiling, then bending (a quadratic, slope 1 to 0) onto it at 5/4 of it; above, the ceiling. The voice has no more
+# clean headroom than this: the strike's first peaks reach -9 to -6 dBFS at most settings, and 8 dB here (with the knee
+# from half the ceiling) added 7 to 15 dB of distortion to the sound.
+BOOST_DB = 3.0
 CORE_X = 1.0         # the FM core's output is the reference's x (its carrier at 1/16 full scale; x = car / 2)
 DRIVE_SCALE = 8.0    # into and through the resonator: 8x the reference's level
 LOGQ = 24            # log2 values are Q24
