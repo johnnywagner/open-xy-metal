@@ -2,10 +2,10 @@
 #include <opxy/draw.hpp>
 
 namespace metal {
-// Twelve rings (the six modes, mirrored about the middle), each drawn from ten pieces: four quarter arcs, two
-// straight pieces down each side, one across the top and one across the bottom. No paths or text; 16 white strokes
+// Twelve rings (the six modes, mirrored about the middle), each drawn from fourteen pieces: four quarter arcs, four
+// long straight pieces, two short ones and four hatch lines, placed to make a ring, triangle, diamond or figure 8. No paths or text; 16 white strokes
 // of different widths (a piece takes the width that undoes its scale).
-using Frame = opxy::draw::Frame<0, 0, 120, 0, 16>;
+using Frame = opxy::draw::Frame<0, 0, 168, 0, 16>;
 struct DisplayState {
     opxy::u32 initialized, track, previous_event;
     opxy::i32 ages[6];       // Q10 seconds since each mode was struck
@@ -15,5 +15,7 @@ struct DisplayState {
     opxy::i32 speed[12];     // and its speed, Q10 pixels a second
     opxy::i32 carry;         // Q10 seconds not yet stepped (the chain steps 1/128 s at a time)
     opxy::u32 strikes;       // notes so far: odd ones kick the chain from the left, even from the right
+    opxy::u32 sway[12];      // each ring's sway and bob, a full cycle per 2^32
+    opxy::u32 bob[12];
 };
 }
