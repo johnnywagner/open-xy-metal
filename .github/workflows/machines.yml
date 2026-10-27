@@ -61,7 +61,7 @@ jobs:
           python-version: '3.11'
       - name: Pinned Blackfin tools
         run: python open-xy/sdk.py toolchain fetch
-      - name: Firmware compile with the bundled machines
+      - name: Firmware compile (OP-XY OS 1.2.1, the SDK's current target)
         shell: bash
         run: |
           args=()

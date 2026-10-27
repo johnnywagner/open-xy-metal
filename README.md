@@ -21,7 +21,7 @@ The port kit keeps the prototype's name: its engine is `rings.c`.
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
 | [tools/probe.c](tools/probe.c) | The float reference with every stage exposed, for levels and debugging |
 
-The SDK lives beside this repository (`../open-xy`, branch `staging`).
+The SDK lives beside this repository (`../open-xy`, branch `staging`), which builds for OP-XY OS 1.2.1.
 
 ## Controls
 
