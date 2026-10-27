@@ -214,4 +214,4 @@ audibly needs a listen on the device with more than eight notes ringing.
 ## Licensing
 
 Metal is clean-room: written from measurement and analysis, with no Elektron code or data. No AGPL code (the SDK's
-Timestretch) is used. The repository's LICENSE is the template's MIT notice; put your own name in it if you want.
+Timestretch) is used. The repository's LICENSE is the MIT licence.
