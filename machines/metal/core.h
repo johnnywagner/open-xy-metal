@@ -16,6 +16,7 @@ struct Voice {
     u32 knobs_seen;          // knob[] holds the words the set-up was made for
     i32 knob[4];             // drop, ratio, stretch, modes as last applied
     i32 linc;                // log2 of setup_inc as a voice-rate increment, Q24
+    i32 trim;                // log2 of the output gain for the knobs' setting (trim.h), Q24, 0 or below
     i32 sp, lsp;             // the FM lattice spacing for RATIO (Q26) and its log2
     i32 ldm[MODES];          // log2 of each material ratio's distance to that lattice (Q26; NO_LOG for none), make-up
     // DROP

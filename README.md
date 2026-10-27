@@ -67,6 +67,15 @@ against the kit's renders):
 The band after the modes carries the output gain: 12 dB above the brief's level (which was 13 dB under 2op FM), plus
 `BOOST_DB` (1 dB). The output is clamped at the SDK's half-scale ceiling (-6 dBFS); there is no limiter.
 
+**The trim.** At many settings a strike's first milliseconds would pass that ceiling and be clipped (measured over every
+3rd step of each knob and every second note from C1 to C7: at 21% of them, by up to 5.7 dB; worst with DROP low,
+RATIO high, and few modes). `trim.h` (`tools/gen_trim.py`) holds, for each of those settings, how far to turn the voice
+down so that its loudest note stays 0.5 dB under the ceiling, each node covering its neighbours' needs too; the engine
+interpolates it over the four knobs whenever one moves and folds it into the band's gain, so it costs nothing per
+sample. About 70% of settings are turned down somewhat (by 1.4 dB at the median, 4.8 at most); over 800 random settings
+at every note from C1 to C7, none then reaches the ceiling (the loudest is 0.1 dB under it). The paragraph below
+predates it.
+
 That 1 dB is all the clean headroom there is. The loud part of a Metal note is its first 50 ms (the strike, BITE and
 the modes' early ring), which peaks 11 to 16 dB above the ring's loudness: over a grid of every knob setting from C1
 to C7, peaks run from -14.7 to -6.2 dBFS before the boost (median -9.5). With 1 dB, 1.5% of those renders touch the

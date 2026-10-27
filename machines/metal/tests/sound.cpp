@@ -215,6 +215,7 @@ static void modal_block_v(rings_t* v, float* x)
 }
 // The half-band to the output rate (engine.cpp): two paths of first-order allpasses on half the voice's output.
 static double hb_state[5];
+static double model_trim = 1;                // the voice's output trim (trim.h), set by run()
 // The machine's whole block (engine.cpp) on the reference's state, in double precision, with its stages in the
 // port's units: core, drive and mix at the voice rate (at its index atv), the output at the output rate (ato). fir holds
 // the low-pass FIR's last two inputs.
@@ -248,7 +249,7 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
     for (int n = 0; n < STEPV; ++n) x[n] = bq_run(&st1, x[n]);
     modal_block_v(v, x);
     for (int n = 0; n < STEPV; ++n) tap[2][atv + n] = x[n] / ((1.f - WET) * gs);
-    const float gsx = DIST_PAD * G_FX * v->outgain;
+    const float gsx = DIST_PAD * G_FX * v->outgain * (float)model_trim;   // and the voice's trim
     double c[4];
     for (int i = 0; i < 4; ++i) c[i] = metal::HB_IIR[i] / 2147483648.0;
     double* q = hb_state;
@@ -411,9 +412,12 @@ Result run(const Setting& s, double* port[T_COUNT], double* exact[T_COUNT], doub
             if (a > r.peak) r.peak = a;
         }
     }
+    dbl::model_trim = std::exp2(voice.trim / 16777216.0);   // the voice's trim (trim.h): the model turns down as much
     model_run(s, exact);
     static float buffer[N];
     spec_run(s, spec[T_OUT], buffer);
+    // The float reference has no trim: compare against it turned down as much.
+    for (int n = 0; n < N; ++n) spec[T_OUT][n] *= dbl::model_trim;
     for (int k = 0; k < T_COUNT; ++k) r.snr[k] = snr(port[k], exact[k], 0, k == T_OUT ? N : N / 2);
     r.snr_float = snr(port[T_OUT], spec[T_OUT], 0);
     return r;

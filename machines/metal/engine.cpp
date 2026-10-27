@@ -33,6 +33,7 @@
 // everything else is as exact as before (the mix's two passes, hot modes, band, fir_tail, ceiling2; README: Overflow).
 #include "core.h"
 #include "fixmath.h"
+#include "trim.h"
 
 namespace metal {
 namespace {
@@ -68,7 +69,7 @@ __attribute__((noinline)) void setup_chain(Voice& v, u32 inc) {
     v.ch_c[0] = exp2q(ONE_LOG + lu + log2q(exp2q(L_CH_A1, 27) + exp2q(L_CH_A0 + lu + ONE_LOG, 27), 27) - ld1, 30);   // 2u (a1 + 2 a0 u) / D
     v.ch_c[1] = exp2q(ONE_LOG + L_CH_A1 + lu - ld1, 31);
     const i32 q1 = exp2q(L_CH_C1 + lu, 25), q2 = exp2q(L_CH_C0 + 2 * lu, 25);   // Q25: up to the top notes at the voice rate
-    const i32 ld2 = log2q((1 << 25) + q1 + q2, 25), lg = L_OUT - ld1 - ld2 + ONE_LOG;
+    const i32 ld2 = log2q((1 << 25) + q1 + q2, 25), lg = L_OUT + v.trim - ld1 - ld2 + ONE_LOG;
     v.ch_c[2] = exp2q(L_CH_B2 + lg, 27);
     v.ch_c[3] = exp2q(L_CH_B1 + lu + lg, 27);
     v.ch_c[4] = exp2q(ONE_LOG + lu + log2q(exp2q(L_CH_C1, 25) + exp2q(L_CH_C0 + lu + ONE_LOG, 25), 25) - ld2, 29);
@@ -97,6 +98,33 @@ inline i32 ratio_of(i32 knob) {
     if (knob <= RATIO_KNOB_98) return mul(knob, RATIO_LO);
     const i32 up = mul29(knob - RATIO_KNOB_98, RATIO_HI);
     return up >= MAX - RATIO_98 ? MAX : RATIO_98 + up;
+}
+// The output's trim for a setting of the four knobs: TRIM (trim.h) interpolated over them, 0.4 dB a unit, as log2,
+// Q24. Where the knobs make the strike louder than the ceiling allows (high RATIO, low MODES and STRETCH, DROP near 0),
+// the voice is turned down just enough to stay under it.
+inline i32 trim_axis(i32 knob, i32 nodes, i32 scale, i32& f) {
+    const i32 p = ((knob >> 15) * scale) >> 8;          // Q16 nodes
+    const i32 i = p >> 16;
+    f = i >= nodes - 1 ? 0 : (p & 0xFFFF) >> 4;         // Q12
+    return i >= nodes - 1 ? nodes - 1 : i;
+}
+inline i32 trim_at(i32 at) { return (TRIM[at >> 1] >> ((at & 1) * 4)) & 15; }   // four bits a node
+__attribute__((noinline)) i32 trim_for(const i32* knob) {
+    i32 f[4], i[4];
+    const i32 nodes[4] = {TRIM_D, TRIM_R, TRIM_S, TRIM_M}, scales[4] = {TRIM_D_SCALE, TRIM_R_SCALE, TRIM_S_SCALE, TRIM_M_SCALE};
+    for (unsigned k = 0; k < 4; ++k) i[k] = trim_axis(knob[k], nodes[k], scales[k], f[k]);
+    i32 level[8];                                      // over MODES at each corner of the other three, Q8 units
+    for (unsigned c = 0; c < 8; ++c) {
+        const i32 d = i[0] + (c & 1 ? 1 : 0), r = i[1] + (c & 2 ? 1 : 0), s = i[2] + (c & 4 ? 1 : 0);
+        const i32 dd = d < TRIM_D ? d : TRIM_D - 1, rr = r < TRIM_R ? r : TRIM_R - 1, ss = s < TRIM_S ? s : TRIM_S - 1;
+        const i32 row = ((dd * TRIM_R + rr) * TRIM_S + ss) * TRIM_M, m = i[3], mm = m + 1 < TRIM_M ? m + 1 : m;
+        const i32 lo = trim_at(row + m), hi = trim_at(row + mm);
+        level[c] = (lo << 8) + ((((hi - lo) << 8) * f[3]) >> 12);
+    }
+    for (unsigned c = 0; c < 4; ++c) level[c] += ((level[c + 4] - level[c]) * f[2]) >> 12;   // STRETCH
+    for (unsigned c = 0; c < 2; ++c) level[c] += ((level[c + 2] - level[c]) * f[1]) >> 12;   // RATIO
+    level[0] += ((level[1] - level[0]) * f[0]) >> 12;                                         // DROP
+    return -(((level[0] >> 4) * TRIM_UNIT_LOG) >> 4);
 }
 __attribute__((noinline)) void set_drop(Voice& v, i32 knob) {
     const i32 x = drop_lanes(knob);
@@ -521,11 +549,18 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
     if (!v.knobs_seen || stretch != v.knob[2]) { set_stretch(v, stretch); remode = true; }
     if (!v.knobs_seen || modes != v.knob[3]) { set_modes(v, modes); v.gx_dirty = 1; }
     if (!v.knobs_seen || ratio_word != v.knob[1]) { set_ratio(v, ratio_word); remakeup = true; }
+    bool retrim = false;                               // the output's trim, from the knobs as turned
+    if (!v.knobs_seen || drop != v.knob[0] || ratio_word != v.knob[1] || stretch != v.knob[2] || modes != v.knob[3]) {
+        const i32 turned[4] = {drop, knob_word(parameters[1]), stretch, modes};
+        const i32 t = trim_for(turned);
+        if (t != v.trim) { v.trim = t; retrim = true; }
+    }
     v.knob[0] = drop; v.knob[1] = ratio_word; v.knob[2] = stretch; v.knob[3] = modes; v.knobs_seen = 1;
     // ---- pitch: set up again when it moves more than about 3.4 cents (glide, bend, transpose)
     const u32 inc = pitch[0];
     const u32 moved = inc > v.setup_inc ? inc - v.setup_inc : v.setup_inc - inc;
     if (!v.setup_inc || moved > (v.setup_inc >> 9)) { setup_pitch(v, inc); remode = true; }
+    else if (retrim) setup_chain(v, 2u * (v.setup_inc < CHAIN_TOP ? v.setup_inc : CHAIN_TOP));   // the band carries the gain
     if (remode) { setup_modes(v); remakeup = true; v.gx_dirty = 1; }
     if (remakeup) setup_makeup(v);
     for (unsigned k = 0; k < MODES; ++k) {             // make-up eases ~20 ms
