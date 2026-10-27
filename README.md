@@ -27,19 +27,19 @@ The SDK lives beside this repository (`../open-xy`, branch `staging`).
 
 | Encoder | Control | Readout |
 | --- | --- | --- |
-| 1 | DROP: the FM starts away from the note and drops onto it. One knob drives the start offset (+9 to -31.5 semitones) and the time (37 to 79 ms) | 0..100 |
-| 2 | RATIO: op2 : carrier, 0..1 | 0.00..1.00 |
-| 3 | STRETCH: the material's mode ratios in log2 times 2^(2 x - 1): squeezed to ratio^1/2 at -100, the material at 0, spread to ratio^2 at +100 | -100..+100 |
-| 4 | MODES: 1..6 modes, continuous; the next mode fades in | 1.0..6.0 |
+| 1 | DROP: the FM starts away from the note and drops onto it. One knob drives the start offset (+9 to -31.5 semitones) and the time (37 to 79 ms); no offset at 25 (0..25 covers the reference's knob up to its zero, 0.17; 25..99 the rest) | 0..99 |
+| 2 | RATIO: op2 : carrier, the readout / 100 (0.00..0.98), and 1.00 at 99 | 0..99 |
+| 3 | STRETCH: the material's mode ratios in log2 times 2^(2 x - 1): squeezed to ratio^1/2 at 0, the material at 49.5, spread to ratio^2 at 99 | 0..99 |
+| 4 | MODES: 1..6 modes, continuous (1 at 0, 6 at 99); the next mode fades in | 0..99 |
 
-All four are the reference's mappings, except that MODES runs over the reference's first six modes, not its eight
+Every readout is 0..99, as the OP-XY's own synths show theirs. Under them are the reference's mappings (DROP skewed and RATIO stepped as above), except that MODES runs over the reference's first six modes, not its eight
 (for CPU: each mode costs about 520 instructions per voice block). The modes sit at the material's ratios with the reference's small fixed detune
 per mode; the first is at 0.54 of the note (0.29 at STRETCH +100). Make-up is the reference's: modes off the FM's
 harmonic lattice get up to 18 dB more (they catch less of it), modes stretched up up to 12 dB more. The modes stop at
 10.9 kHz, fading from 9.8 kHz.
 
-The presets: **Metal** (STRETCH +100), **Material** (0), **Squeezed** (-50), **All modes** (MODES 6) and **Fall**
-(DROP 100).
+The presets: **Metal** (STRETCH 99), **Material** (50), **Squeezed** (25), **All modes** (MODES 99) and **Fall**
+(DROP 99).
 
 ### Envelope: option B
 

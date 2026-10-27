@@ -2,29 +2,13 @@
 #pragma once
 #include <opxy/types.hpp>
 namespace metal {
-// DROP's start offset in semitones at the knob's 17 sixteenths, Q10
-const opxy::i32 DISPLAY_DROP_ST[17] = {
-    9216, 4615, 1863, -458, -2536, -4450, -6244, -7943,
-    -9565, -10403, -10575, -11225, -12661, -15185, -19095, -24688,
-    -32256,
-};
-// DROP's time in ms at the knob's sixteenths, Q10
-const opxy::i32 DISPLAY_DROP_MS[17] = {
-    38377, 42914, 45969, 48735, 51367, 53929, 56452, 58958,
-    61459, 65783, 68922, 71348, 73473, 75421, 77249, 78989,
-    80663,
-};
 // how much of the drop is left at 24 points through it (its fixed shape), Q10
 const opxy::i32 DISPLAY_DROP_LEFT[24] = {
     1024, 1021, 1013, 1000, 983, 963, 938, 910,
     878, 843, 804, 761, 716, 666, 614, 558,
     500, 438, 372, 304, 233, 158, 81, 0,
 };
-// how long each mode's halo lasts on screen after a note, seconds Q10 (upper modes ring shorter)
-const opxy::i32 DISPLAY_RING[8] = {
-    922, 880, 799, 719, 636, 577, 533, 474,
-};
-// its reciprocal, Q16
+// 1 / how long each mode's pulse lasts on screen after a note (0.9 x its ring time, at most 4 s), per second Q16
 const opxy::i32 DISPLAY_RING_INV[8] = {
     72818, 76245, 84033, 93286, 105545, 116276, 125921, 141499,
 };
