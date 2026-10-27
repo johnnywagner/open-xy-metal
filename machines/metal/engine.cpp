@@ -248,6 +248,7 @@ __attribute__((noinline)) void setup_makeup(Voice& v) {
         if (!v.mk[k]) v.mk[k] = v.mk_target[k];
     }
     v.gx_dirty = 1;
+    v.easing = 1;
 }
 // Each mode's input gain: the reference's b = (1 - r) |1 - r e^(2 j th)| ra RES_GAIN edge make-up MODES, in log2.
 // Modes above VR/4 take the drive every voice sample. Below, it arrives once per two samples as the pair's sum, whose
@@ -517,23 +518,50 @@ void clear(Voice& voice) {
 
 // One sample of the band's poles, e = 16 n + 2 e1 - e2 - 4 m2 + m3 (n: its numerator, m2 = e1 (2 + a1'),
 // m3 = e2 (1 - a2')), saturated where it would leave the 32-bit range (a voice struck again and again can drive it
-// there) and exact everywhere else. e = 4 q + (r & 3), with r = 2 (e1 & 1) + m3 - e2 and
-// q = 4 n - m2 + (e1 >> 1) + (r >> 2): r never wraps (0 < m3 / e2 <= 1), and q only far past the range (beyond four
-// times it), so q says where e is.
+// there) and exact everywhere else. With r = 2 (e1 & 1) + m3 - e2 and b = 4 n - m2 + (e1 >> 1), e = 4 b + r and
+// q = b + (r >> 2) is floor(e / 4): r never wraps (0 < m3 / e2 <= 1), and q only far past the range (beyond four times
+// it). e is in range just where q is, and there e >> 2 gives q back; where it is not, 4 b + r wrapped and cannot.
 inline i32 band(i32 n, i32 e1, i32 e2, i32 m2, i32 m3) {
     const i32 r = ((e1 & 1) << 1) + (m3 - e2);
-    const u32 q = 4u * static_cast<u32>(n) - static_cast<u32>(m2) + static_cast<u32>(e1 >> 1) + static_cast<u32>(r >> 2);
-    i32 e = static_cast<i32>(4u * q + static_cast<u32>(r & 3));
-    if ((q ^ (q << 1)) >> 30) e = (static_cast<i32>(q) >> 31) ^ MAX;   // out of range: q's top three bits disagree
-    return e;
+    const u32 b = 4u * static_cast<u32>(n) - static_cast<u32>(m2) + static_cast<u32>(e1 >> 1);
+    const i32 q = static_cast<i32>(b + static_cast<u32>(r >> 2));      // floor(e / 4), exact
+    const i32 e = static_cast<i32>(4u * b + static_cast<u32>(r));      // e, wrapped where q is out of range
+    return (e >> 2) == q ? e : (q >> 31) ^ MAX;
 }
 
-// 2 u at the half-scale ceiling. The allpasses can overshoot half scale (to 1.43 times it, their paths' L1 gain), so
-// 2 u saturates where it would wrap; the same as before for every u where it did not.
+// 2 u at the half-scale ceiling. The half-band's input is within 2^29 (the band's clamp), and its paths' L1 gains are
+// 2.28 and 2.86, so u stays within 2.86 times 2^29 and nothing in the paths wraps (their largest intermediate, t - b,
+// within 3.87 times it): |u| is always defined. Below 2^29, |2 u| <= HALF_SCALE - 1; from there 2 u is at or past the
+// ceiling (or would wrap), so it saturates.
 inline i32 ceiling2(i32 u) {
-    const i32 v = static_cast<i32>(2u * static_cast<u32>(u));
-    if ((v ^ u) < 0) return u < 0 ? -HALF_SCALE : HALF_SCALE;   // 2 u wrapped
-    return clamp(v, -HALF_SCALE, HALF_SCALE);
+    return absolute(u) < (1 << 29) ? 2 * u : (u < 0 ? -HALF_SCALE : HALF_SCALE);
+}
+
+// The low-pass FIR, in place: g[n] into buf[n] (buf: VN + 2 samples).
+__attribute__((noinline)) void stage_fir(i32* buf) {
+    i32 p0 = buf[0], p1 = buf[1];
+    for (unsigned n = 0; n < VN; ++n) {
+        const i32 p2 = buf[n + 2];
+        const i32 hp = (p0 >> 1) + (p2 >> 1);
+        const i32 dd = static_cast<i32>(static_cast<u32>(hp) - static_cast<u32>(p1));
+        if (((hp ^ p1) & (hp ^ dd)) >= 0) buf[n] = (p1 >> 1) + (dd >> 5) + (dd >> 10);   // h = LP_FIR = 1/32 + 1/1024
+        else buf[n] = (p1 >> 1) + fir_tail(hp, p1);  // dd wrapped (a full-scale mix at the top of the band)
+        p0 = p1; p1 = p2;
+    }
+}
+
+// To the output rate: the half-band's two allpass paths (on half the signal, for headroom), then the ceiling.
+__attribute__((noinline)) void stage_hb(Voice& v, const i32* buf, i32* output) {
+    i32 h0 = v.hb[0], a0 = v.hb[1], b0 = v.hb[2], a1 = v.hb[3], b1 = v.hb[4];
+    for (unsigned n = 0; n < VN; ++n) {
+        const i32 s0 = buf[n];
+        const i32 t0 = mul(HB_IIR[0], s0 - a0) + h0, u0 = mul(HB_IIR[2], t0 - b0) + a0;
+        const i32 t1 = mul(HB_IIR[1], s0 - a1) + h0, u1 = mul(HB_IIR[3], t1 - b1) + a1;
+        h0 = s0; a0 = t0; b0 = u0; a1 = t1; b1 = u1;
+        output[2 * n] = ceiling2(u0);
+        output[2 * n + 1] = ceiling2(u1);
+    }
+    v.hb[0] = h0; v.hb[1] = a0; v.hb[2] = b0; v.hb[3] = a1; v.hb[4] = b1;
 }
 
 // Taps for the machine's own tests: each stage of the last block (the voice-rate stages at 32 samples). Null in the
@@ -563,11 +591,16 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
     else if (retrim) setup_chain(v, 2u * (v.setup_inc < CHAIN_TOP ? v.setup_inc : CHAIN_TOP));   // the band carries the gain
     if (remode) { setup_modes(v); remakeup = true; v.gx_dirty = 1; }
     if (remakeup) setup_makeup(v);
-    for (unsigned k = 0; k < MODES; ++k) {             // make-up eases ~20 ms
-        const i32 d = v.mk_target[k] - v.mk[k];
-        if (!d) continue;
-        v.mk[k] = absolute(d) < 256 ? v.mk_target[k] : v.mk[k] + mul(d, KK_MAKEUP);
-        v.gx_dirty = 1;
+    if (v.easing) {                                    // make-up eases ~20 ms
+        i32 left = 0;
+        for (unsigned k = 0; k < MODES; ++k) {
+            const i32 d = v.mk_target[k] - v.mk[k];
+            if (!d) continue;
+            v.mk[k] = absolute(d) < 256 ? v.mk_target[k] : v.mk[k] + mul(d, KK_MAKEUP);
+            v.gx_dirty = 1;
+            left |= v.mk_target[k] - v.mk[k];
+        }
+        v.easing = left != 0;
     }
     if (v.gx_dirty) update_b(v);
     // ---- note-on
@@ -636,17 +669,7 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
     // headroom), then the ceiling
     buf[0] = v.fir[0]; buf[1] = v.fir[1];
     v.fir[0] = buf[VN]; v.fir[1] = buf[VN + 1];
-    {   // the low-pass FIR, in place: g[n] into buf[n]
-        i32 p0 = buf[0], p1 = buf[1];
-        for (unsigned n = 0; n < VN; ++n) {
-            const i32 p2 = buf[n + 2];
-            const i32 hp = (p0 >> 1) + (p2 >> 1);
-            const i32 dd = static_cast<i32>(static_cast<u32>(hp) - static_cast<u32>(p1));
-            if (((hp ^ p1) & (hp ^ dd)) >= 0) buf[n] = (p1 >> 1) + (dd >> 5) + (dd >> 10);   // h = LP_FIR = 1/32 + 1/1024
-            else buf[n] = (p1 >> 1) + fir_tail(hp, p1);  // dd wrapped (a full-scale mix at the top of the band)
-            p0 = p1; p1 = p2;
-        }
-    }
+    stage_fir(buf);
     if (shaped) for (unsigned n = 0; n < VN; ++n) buf[n] = mul(buf[n], gains[n]);
     {   // the band: its numerator from g (into x, which the drive is done with), then its poles; then half, for the
         // half-band's headroom, in place
@@ -669,18 +692,7 @@ inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, 
         v.chain[6] = e1; v.chain[7] = e2;
     }
     if (taps) for (unsigned n = 0; n < VN; ++n) taps->voice[n] = buf[n] * 2;
-    {   // to the output rate: the half-band's two allpass paths, then the ceiling
-        i32 h0 = v.hb[0], a0 = v.hb[1], b0 = v.hb[2], a1 = v.hb[3], b1 = v.hb[4];
-        for (unsigned n = 0; n < VN; ++n) {
-            const i32 s0 = buf[n];
-            const i32 t0 = mul(HB_IIR[0], s0 - a0) + h0, u0 = mul(HB_IIR[2], t0 - b0) + a0;
-            const i32 t1 = mul(HB_IIR[1], s0 - a1) + h0, u1 = mul(HB_IIR[3], t1 - b1) + a1;
-            h0 = s0; a0 = t0; b0 = u0; a1 = t1; b1 = u1;
-            output[2 * n] = ceiling2(u0);
-            output[2 * n + 1] = ceiling2(u1);
-        }
-        v.hb[0] = h0; v.hb[1] = a0; v.hb[2] = b0; v.hb[3] = a1; v.hb[4] = b1;
-    }
+    stage_hb(v, buf, output);                          // to the output rate: the half-band's two allpass paths, the ceiling
     if (taps) for (unsigned n = 0; n < opxy::block_frames; ++n) taps->out[n] = output[n];
 }
 } // namespace

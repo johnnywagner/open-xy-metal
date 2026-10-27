@@ -210,6 +210,23 @@ settings (pitch, knobs, retriggers, knob moves, glides) on the host and on the s
 
 Then the overflow guards (above) cost about a fifth of the voice back.
 
+A later pass, again the same output bit for bit (7,500 renders of the overflow check's kinds of settings on the host,
+and the Blackfin code against the host at four settings), took 857 instructions off a held voice block at the CPU
+benchmark's setting (knobs at midpoint, note 60): 8,956 to 8,099, and 10,058 to 9,201 at MODES 6 (440 Hz). These
+counts are from an interpreter of the pinned compiler's Blackfin output, which reads about 8% above the simulator's
+figures in the table; the differences are what to compare. What it did:
+
+- The low-pass FIR and the half-band each run in a function of their own: the compiler then gives the rest of the
+  voice's code better registers, and the FIR becomes a hardware loop.
+- The band's range check compares `e >> 2` with q, and the ceiling saturates from `|u| >= 2^29` (the half-band's
+  bound, at `ceiling2`), each in fewer instructions and registers.
+- Make-up's easing loop stops running once every mode has reached its target (`Voice::easing`).
+
+Most of that saving is register allocation in one large function, so later changes to `process()` can move it either
+way. Tried and not kept (each more instructions): per-function optimisation attributes (and clang rejects them), the
+half-band's paths in separate loops, the numerator or the carrier unrolled, the high-pass, the core or the modes in
+functions of their own.
+
 `sdk.py test` estimates 20,000 to 30,000 Blackfin instructions per voice block at the heaviest setting, varying that
 much between runs. The estimate times the host, where the SDK's portable Q31 multiply takes a dozen instructions and an
 unpredictable branch, so it is mostly a count of multiplies. No device measurement has been made.

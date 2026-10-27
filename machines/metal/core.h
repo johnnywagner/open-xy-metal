@@ -59,6 +59,7 @@ struct Voice {
     u32 high;                // bit k: mode k is above VR/7
     u32 pair;                // bit k: mode k is below VR/4 (input once per two); otherwise every voice sample
     u32 gx_dirty;
+    u32 easing;              // make-up has not reached its targets
 };
 // metal voices share nothing.
 struct Shared {};
