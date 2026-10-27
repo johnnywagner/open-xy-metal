@@ -85,7 +85,21 @@ i32 lane(i32 x, i32 mid, i32 e1, i32 e2) {
     const i32 y = clamp(mul29(x - DROP_SPLIT_Q31, DROP_HI_INV), 0, MAX);
     return mid + mul(MAX - mid, y ? exp2q(mul29(log2q(y, 31), e2), 31) : 0);
 }
-__attribute__((noinline)) void set_drop(Voice& v, i32 x) {
+// The OP-XY shows each knob 0..99. DROP's 25 is where the sweep is none: 0..25 covers the lanes up to their own zero
+// (DROP_ZERO, about 17) and 25..99 the rest, both linearly.
+inline i32 drop_lanes(i32 knob) {
+    if (knob <= DROP_KNOB_25) return mul(knob, DROP_SKEW_LO);
+    const i32 up = mul29(knob - DROP_KNOB_25, DROP_SKEW_HI);
+    return up >= MAX - DROP_ZERO ? MAX : DROP_ZERO + up;
+}
+// RATIO shows its value / 100 at 0..98 of 0..99, and 1.00 at 99.
+inline i32 ratio_of(i32 knob) {
+    if (knob <= RATIO_KNOB_98) return mul(knob, RATIO_LO);
+    const i32 up = mul29(knob - RATIO_KNOB_98, RATIO_HI);
+    return up >= MAX - RATIO_98 ? MAX : RATIO_98 + up;
+}
+__attribute__((noinline)) void set_drop(Voice& v, i32 knob) {
+    const i32 x = drop_lanes(knob);
     i32 oct = SW_A0 + mul(SW_SPAN, lane(x, SW_MID, SW_E1, SW_E2));
     if (absolute(oct) < SW_DEAD) oct = 0;
     v.sweep_oct = oct;
@@ -500,7 +514,7 @@ struct Taps { i32 core[32], drive[32], mix[32], voice[32], out[64]; };
 
 inline void process(Voice& v, opxy::Output output, opxy::Parameters parameters, opxy::Pitch pitch, Taps* taps) {
     // ---- knobs
-    const i32 drop = knob_word(parameters[0]), ratio_word = knob_word(parameters[1]);
+    const i32 drop = knob_word(parameters[0]), ratio_word = ratio_of(knob_word(parameters[1]));
     const i32 stretch = knob_word(parameters[2]), modes = knob_word(parameters[3]);
     bool remode = false, remakeup = false;
     if (!v.knobs_seen || drop != v.knob[0]) set_drop(v, drop);

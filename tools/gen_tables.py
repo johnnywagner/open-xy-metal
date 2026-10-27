@@ -370,6 +370,26 @@ const('TM_E2', q(curve_exp(TM_CURVE2), 29), 'above it, Q29')
 const('L_DT_T0', log2q(dt * 1000 / t0), "log2 of 16 samples over the time lane's start (37 ms)")
 const('L_T1_T0', log2q(t1 / t0), "log2 of the time lane's end over its start")
 const('SWEEP_E', q(sweep_e - 1, 31), "DROP's shape: what is left is 1 - u^(1 + this), Q31")
+# The OP-XY shows each knob as 0..99. DROP's knob is skewed so that 25 is where the sweep is none (the lanes' own zero
+# is at DROP_ZERO, about 17): 0..25 of the knob covers 0..DROP_ZERO of the lanes and 25..99 the rest, both linearly.
+def sweep_at(x):
+    sp = DROP_SPLIT
+    l = SW_MID * (x / sp) ** curve_exp(SW_CURVE) if x <= sp else SW_MID + (1 - SW_MID) * ((x - sp) / (1 - sp)) ** curve_exp(SW_CURVE2)
+    return sw_a0 + (sw_a1 - sw_a0) * l
+lo, hi = 0.0, DROP_SPLIT
+for _ in range(60):
+    mid = (lo + hi) / 2
+    lo, hi = (mid, hi) if sweep_at(mid) > 0 else (lo, mid)
+DROP_ZERO = (lo + hi) / 2
+const('DROP_KNOB_25', q(25 / 99), "DROP's knob at 25 of 0..99, Q31")
+const('DROP_ZERO', q(DROP_ZERO), 'where the lanes put no sweep, Q31 (%.4f)' % DROP_ZERO)
+const('DROP_SKEW_LO', q(DROP_ZERO * 99 / 25), "the lanes per knob below 25, Q31")
+const('DROP_SKEW_HI', q((1 - DROP_ZERO) * 99 / 74, 29), "and above it, Q29")
+# RATIO shows 0..99 as 0.00..0.98 (the value / 100), with 99 as 1.00.
+const('RATIO_KNOB_98', q(98 / 99), "RATIO's knob at 98 of 0..99, Q31")
+const('RATIO_LO', q(99 / 100), 'RATIO per knob up to 98, Q31')
+const('RATIO_98', q(0.98), 'RATIO at 98, Q31')
+const('RATIO_HI', q(1.98, 29), 'RATIO per knob from 98 to 99, Q29')
 table('SINE', SINE, per=8, comment='sin, 2048 points per cycle and a guard point, Q30')
 table('SINE16', [max(-32767, min(32767, int(round(math.sin(2 * math.pi * i / 4096) * 32768)))) for i in range(4096)], ctype='opxy::i16', per=16, comment='sin, 4096 points per cycle, Q15: the FM core reads it without interpolation (phase spurs below -70 dBc)')
 table('LOG2T', LOG2T, comment='log2(1 + i/1024), Q30')
@@ -392,19 +412,10 @@ def dtable(name, values, comment):
     for i in range(0, len(values), 8):
         d.append('    ' + ', '.join(str(v) for v in values[i:i + 8]) + ',')
     d.append('};')
-knobs = [i / 16 for i in range(17)]
-st = []
-for x in knobs:
-    v = sw_a0 + (sw_a1 - sw_a0) * lane_pos(x, SW_MID, SW_CURVE, SW_CURVE2)
-    st.append(round((0.0 if abs(v) < 0.05 else v) * 1024))
-dtable('DISPLAY_DROP_ST', st, "DROP's start offset in semitones at the knob's 17 sixteenths, Q10")
-dtable('DISPLAY_DROP_MS', [round(t0 * (t1 / t0) ** lane_pos(x, TM_MID, TM_CURVE, TM_CURVE2) * 1024) for x in knobs],
-       "DROP's time in ms at the knob's sixteenths, Q10")
 dtable('DISPLAY_DROP_LEFT', [round((1 - (i / 23) ** sweep_e) * 1024) for i in range(24)],
        "how much of the drop is left at 24 points through it (its fixed shape), Q10")
-dtable('DISPLAY_RING', [round(min(4.0, 0.9 * rt[k]) * 1024) for k in range(8)],
-       "how long each mode's halo lasts on screen after a note, seconds Q10 (upper modes ring shorter)")
-dtable('DISPLAY_RING_INV', [round(65536 / min(4.0, 0.9 * rt[k])) for k in range(8)], 'its reciprocal, Q16')
+dtable('DISPLAY_RING_INV', [round(65536 / min(4.0, 0.9 * rt[k])) for k in range(8)],
+       "1 / how long each mode's pulse lasts on screen after a note (0.9 x its ring time, at most 4 s), per second Q16")
 d.append('}')
 print('modes: rm', [round(r, 4) for r in rm])
 print('       pole 1-r', [f'{1 - p:.3g}' for p in pole], 'strike samples', len(pulse))

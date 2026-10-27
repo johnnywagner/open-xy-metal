@@ -147,6 +147,14 @@ const i32 TM_E2 = 326462887;                    // above it, Q29
 const i32 L_DT_T0 = -112250707;                 // log2 of 16 samples over the time lane's start (37 ms)
 const i32 L_T1_T0 = 17979509;                   // log2 of the time lane's end over its start
 const i32 SWEEP_E = 1813197312;                 // DROP's shape: what is left is 1 - u^(1 + this), Q31
+const i32 DROP_KNOB_25 = 542293851;             // DROP's knob at 25 of 0..99, Q31
+const i32 DROP_ZERO = 374800682;                // where the lanes put no sweep, Q31 (0.1745)
+const i32 DROP_SKEW_LO = 1484210699;            // the lanes per knob below 25, Q31
+const i32 DROP_SKEW_HI = 592890587;             // and above it, Q29
+const i32 RATIO_KNOB_98 = 2125791894;           // RATIO's knob at 98 of 0..99, Q31
+const i32 RATIO_LO = 2126008812;                // RATIO per knob up to 98, Q31
+const i32 RATIO_98 = 2104533975;                // RATIO at 98, Q31
+const i32 RATIO_HI = 1063004406;                // RATIO per knob from 98 to 99, Q29
 // sin, 2048 points per cycle and a guard point, Q30
 const i32 SINE[2049] = {
     0, 3294193, 6588356, 9882456, 13176464, 16470347, 19764076, 23057618,

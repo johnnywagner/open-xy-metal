@@ -333,6 +333,13 @@ enum { T_CORE, T_DRIVE, T_MIX, T_OUT, T_COUNT };
 
 // The double-precision model of the machine (dbl::block_lite) over a setting.
 opxy::i32 word(double knob) { return static_cast<opxy::i32>(std::floor(knob * 2147483647.0 + 0.5)); }
+// The knob that gives a reference setting: DROP is skewed so 25 of 0..99 is the lanes' zero (DROP_ZERO), RATIO is
+// its value / 100 to 98 and 1.00 at 99 (engine.cpp, drop_lanes and ratio_of).
+double drop_knob(double lanes) {
+    const double zero = metal::DROP_ZERO / 2147483648.0;
+    return lanes <= zero ? lanes / zero * (25.0 / 99) : 25.0 / 99 + (lanes - zero) / (1 - zero) * (74.0 / 99);
+}
+double ratio_knob(double ratio) { return ratio <= 0.98 ? ratio / 0.99 : 98.0 / 99 + (ratio - 0.98) / 1.98; }
 void model_run(const Setting& s, double* tap[T_COUNT]) {
     static dbl::rings_t v;
     double fir[2] = {0, 0};
@@ -385,7 +392,7 @@ struct Result { double snr[T_COUNT], snr_float; opxy::i32 peak; };
 Result run(const Setting& s, double* port[T_COUNT], double* exact[T_COUNT], double* spec[T_COUNT], opxy::i32* pcm) {
     static metal::Voice voice;
     static metal::Shared shared;
-    opxy::i32 parameters[8] = {word(s.drop), word(s.ratio), word(s.stretch), word(s.modes), 0, 0, 0, 0};
+    opxy::i32 parameters[8] = {word(drop_knob(s.drop)), word(ratio_knob(s.ratio)), word(s.stretch), word(s.modes), 0, 0, 0, 0};
     opxy::u32 pitch[64];
     for (int i = 0; i < 64; ++i) pitch[i] = pitch_for(s.note);
     metal::initialize(voice, shared, 1);
