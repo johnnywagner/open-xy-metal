@@ -1,10 +1,10 @@
-// rings' page: the six modes as circles, spaced by their ratio to the note (STRETCH spreads or squeezes them),
+// metal's page: the six modes as circles, spaced by their ratio to the note (STRETCH spreads or squeezes them),
 // lit by how much MODES feeds each; at each note a halo rings out of every fed mode and fades with that mode's ring
 // time. Below, the DROP: the pitch falling from its start offset onto the note, over its time. Screen work only.
 #include "display.h"
 #include "display_tables.h"
 
-namespace rings {
+namespace metal {
 namespace {
 using opxy::i32;
 using opxy::u32;
@@ -133,4 +133,4 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
             hide(frame, 9 + k);
     }
 }
-} // namespace rings
+} // namespace metal

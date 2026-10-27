@@ -7,7 +7,7 @@ output folder) and compares them with port-kit/reference/compare.py, two ways:
   vs kit   the port, with the stock amp envelope emulated (the setting's ATTACK, DECAY and SUSTAIN as one gain on
            the output), against the kit's original render. What does option B change?
 
-    python3 tools/check_renders.py [--machine machines/rings] [--out DIR] [--cxx g++]
+    python3 tools/check_renders.py [--machine machines/metal] [--out DIR] [--cxx g++]
 
 Needs numpy. Run from the repository root, with the SDK checked out beside it (../open-xy).
 """
@@ -87,12 +87,12 @@ def compare(ref, port, gain_match=True):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--machine', default=str(ROOT / 'machines/rings'))
+    p.add_argument('--machine', default=str(ROOT / 'machines/metal'))
     p.add_argument('--out', help='keep the renders here (default: a temporary folder)')
     p.add_argument('--cxx', default='g++')
     args = p.parse_args()
     machine = Path(args.machine).resolve()
-    out = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix='rings-renders-'))
+    out = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix='metal-renders-'))
     out.mkdir(parents=True, exist_ok=True)
     binary = out / 'sound'
     subprocess.run([args.cxx, '-std=c++11', '-O2', '-I' + str(SDK / 'sdk/include'), '-I' + str(machine),

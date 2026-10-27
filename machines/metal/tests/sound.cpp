@@ -1,4 +1,4 @@
-// rings' own sound checks, compiled for the host and run by `python ../open-xy/sdk.py test --machine machines/rings`.
+// metal's own sound checks, compiled for the host and run by `python ../open-xy/sdk.py test --machine machines/metal`.
 //
 // The reference engine (port-kit/engine/rings.c) is compiled into this test twice: as it is (float, the spec), and in
 // double precision, where the machine's own algorithm is built on the reference's state and set-up (dbl::block_v: the
@@ -59,7 +59,7 @@ static const int STEPV = RINGS_BLOCK / 2;
 // state and helpers.
 static float s2pp_state;                             // op2 two steps back (reset per render)
 // The engine's FM sine: the 4096-point Q15 table, read without interpolation.
-static float sin16d(uint32_t ph) { return rings::SINE16[ph >> 20] / 32768.0; }
+static float sin16d(uint32_t ph) { return metal::SINE16[ph >> 20] / 32768.0; }
 static void core_block_v(rings_t* v, float* x)
 {
     double incd = note_hz(v->note) / v->fs;
@@ -129,15 +129,15 @@ static void modal_block_v(rings_t* v, float* x)
     float wk[8];
     // The machine's six modes over the knob, 1 + 5 x (the reference's 1 + 7 x, v->modes), the last two unfed
     const float m6 = 1.f + 5.f * (v->modes - 1.f) / 7.f;
-    for (int k = 0; k < 8; ++k) { const float w = m6 - (float)k; wk[k] = k == 0 ? 1.f : (k >= (int)rings::MODES ? 0.f : (w > 1.f ? 1.f : (w < 0.f ? 0.f : w))); }
+    for (int k = 0; k < 8; ++k) { const float w = m6 - (float)k; wk[k] = k == 0 ? 1.f : (k >= (int)metal::MODES ? 0.f : (w > 1.f ? 1.f : (w < 0.f ? 0.f : w))); }
     const float T = 0.1f * powf(100.f, RDECAY);
     v->rT = 1.f;
     const float mix = WET, dry = 1.f - mix;
-    const int pulse = (int)(sizeof rings::STRIKE / sizeof rings::STRIKE[0]);
+    const int pulse = (int)(sizeof metal::STRIKE / sizeof metal::STRIKE[0]);
     const int at = (int)(v->rst * VR + 0.5f);
     float pl[STEPV]; int strike = 0;
     for (int n = 0; n < STEPV; ++n) {
-        pl[n] = at + n < pulse ? rings::STRIKE[at + n] / 2147483648.0 * (DIST_PAD * G_FM) : 0.f;
+        pl[n] = at + n < pulse ? metal::STRIKE[at + n] / 2147483648.0 * (DIST_PAD * G_FM) : 0.f;
         strike |= pl[n] != 0.f;
     }
     const float Wp = 0.001f * powf(0.2f, RTONE);
@@ -180,7 +180,7 @@ static void modal_block_v(rings_t* v, float* x)
         const float M = sqrtf(1.f - 2.f * r * cosf(2.f * th) + r * r);
         const bool paired = th < 0.5 * 3.14159265358979323846;
         const float b = (1.f - r) * M * v->ra[k] * RES_GAIN * edge * mkg[k] * wk[k] / (paired ? cosf(0.5f * th) : 1.f)
-                        * (float)(rings::RES_TRIM / 536870912.0);    // the modes' drive trim (Q29)
+                        * (float)(metal::RES_TRIM / 536870912.0);    // the modes' drive trim (Q29)
         const float bi = strike ? sinf(th) * sqrtf(v->ra[k]) * RES_GAIN * edge * wk[k] * 2.f / (Wp * VR * wsum) : 0.f;
         float s1 = 0.f, s2 = 0.f;
         if (strike)
@@ -250,7 +250,7 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
     for (int n = 0; n < STEPV; ++n) tap[2][atv + n] = x[n] / ((1.f - WET) * gs);
     const float gsx = DIST_PAD * G_FX * v->outgain;
     double c[4];
-    for (int i = 0; i < 4; ++i) c[i] = rings::HB_IIR[i] / 2147483648.0;
+    for (int i = 0; i < 4; ++i) c[i] = metal::HB_IIR[i] / 2147483648.0;
     double* q = hb_state;
     for (int n = 0; n < STEPV; ++n) {
         const float g = o0 + (o1 - o0) * (float)(n + 1) / STEPV;
@@ -383,17 +383,17 @@ double snr(const double* port, const double* ref, int lag, int n = N) {
 struct Result { double snr[T_COUNT], snr_float; opxy::i32 peak; };
 
 Result run(const Setting& s, double* port[T_COUNT], double* exact[T_COUNT], double* spec[T_COUNT], opxy::i32* pcm) {
-    static rings::Voice voice;
-    static rings::Shared shared;
+    static metal::Voice voice;
+    static metal::Shared shared;
     opxy::i32 parameters[8] = {word(s.drop), word(s.ratio), word(s.stretch), word(s.modes), 0, 0, 0, 0};
     opxy::u32 pitch[64];
     for (int i = 0; i < 64; ++i) pitch[i] = pitch_for(s.note);
-    rings::initialize(voice, shared, 1);
-    rings::start(voice, shared, 1);
-    rings::Taps taps;
+    metal::initialize(voice, shared, 1);
+    metal::start(voice, shared, 1);
+    metal::Taps taps;
     Result r = {{0, 0, 0, 0}, 0, 0};
     for (int b = 0; b < BLOCKS; ++b) {
-        rings::process(voice, pcm + b * 64, parameters, pitch, &taps);
+        metal::process(voice, pcm + b * 64, parameters, pitch, &taps);
         const opxy::i32* t[T_COUNT] = {taps.core, taps.drive, taps.mix, taps.out};
         for (int k = 0; k < T_COUNT; ++k) {
             const int len = k == T_OUT ? 64 : 32;      // the voice-rate stages hold 32 samples a block
@@ -425,20 +425,20 @@ bool wav(const char* path, const void* data, int n, bool is_float) {
 
 // A held note bent continuously: the set-up runs every block. Sounds, stays bounded, no state blows up.
 bool bend_check() {
-    static rings::Voice voice;
-    static rings::Shared shared;
+    static metal::Voice voice;
+    static metal::Shared shared;
     const opxy::i32 parameters[8] = {word(0.5), word(0.3), word(0.2), word(1.0), 0, 0, 0, 0};
     opxy::u32 pitch[64];
     opxy::i32 out[64];
-    rings::initialize(voice, shared, 1);
-    rings::start(voice, shared, 1);
+    metal::initialize(voice, shared, 1);
+    metal::start(voice, shared, 1);
     bool ok = true, sounding = false;
     for (int b = 0; b < 2000; ++b) {
         const double semis = 24.0 * std::sin(b * 0.01) - 12.0;
         const opxy::u32 inc = static_cast<opxy::u32>(note_hz_ref(48) * std::exp2(semis / 12.0) / 44100.0 * 4294967296.0);
         for (int i = 0; i < 64; ++i) pitch[i] = inc;
-        if (b % 300 == 0) rings::start(voice, shared, 1);
-        rings::render(voice, shared, 1, out, parameters, pitch);
+        if (b % 300 == 0) metal::start(voice, shared, 1);
+        metal::render(voice, shared, 1, out, parameters, pitch);
         for (int i = 0; i < 64; ++i) {
             sounding = sounding || out[i] != 0;
             ok = ok && out[i] >= -DECLARED_PEAK && out[i] <= DECLARED_PEAK;
