@@ -1,6 +1,6 @@
-# rings for the OP-XY
+# Metal for the OP-XY
 
-rings is a two-operator FM exciter that drops onto each note and strikes a MODAL resonator. This
+Metal is a two-operator FM exciter that drops onto each note and strikes a MODAL resonator. This
 repository ports it to the OP-XY as an [Open-XY](https://github.com/etcetc000/open-xy) synth machine. It is a
 fixed-point rewrite of the float reference engine in [port-kit/](port-kit/BRIEF.md): Q31 throughout, with no float,
 division or 64-bit arithmetic in the render path, checked against a double-precision model stage by stage. It keeps
@@ -9,11 +9,12 @@ the reference's own mode tuning: atonal and metallic.
 Other versions were tried and removed; they are in the git history: rings with tonal mappings (a harmonic STRETCH
 middle, RATIO magnets; `git show 4669bc6`), a delay-loop resonator (rings3, once `ringsalt`), STRETCH as stops
 through resonator shapes (rings4, `129c5a5`), and rings tuned to consonant intervals or semitones (rings5 and rings6,
-`61ebe9e`). The machine here was called rings2 until those went.
+`61ebe9e`). The machine here was called rings2 until those went, then rings, and is now Metal (ID `metal`).
+The port kit keeps the prototype's name: its engine is `rings.c`.
 
 | Folder | What |
 | --- | --- |
-| [machines/rings](machines/rings) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
+| [machines/metal](machines/metal) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, and its sound test `tests/sound.cpp` |
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
 | [tools/gen_tables.py](tools/gen_tables.py) | Generates `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
@@ -36,7 +37,7 @@ per mode; the first is at 0.54 of the note (0.29 at STRETCH +100). Make-up is th
 harmonic lattice get up to 18 dB more (they catch less of it), modes stretched up up to 12 dB more. The modes stop at
 10.9 kHz, fading from 9.8 kHz.
 
-The presets: **Rings** (STRETCH +100), **Material** (0), **Squeezed** (-50), **All modes** (MODES 6) and **Fall**
+The presets: **Metal** (STRETCH +100), **Material** (0), **Squeezed** (-50), **All modes** (MODES 6) and **Fall**
 (DROP 100).
 
 ### Envelope: option B
@@ -65,7 +66,7 @@ against the kit's renders):
 The band after the modes carries the output gain: 12 dB above the brief's level (which was 13 dB under 2op FM), plus
 `BOOST_DB` (1 dB). The output is clamped at the SDK's half-scale ceiling (-6 dBFS); there is no limiter.
 
-That 1 dB is all the clean headroom there is. The loud part of a rings note is its first 50 ms (the strike, BITE and
+That 1 dB is all the clean headroom there is. The loud part of a Metal note is its first 50 ms (the strike, BITE and
 the modes' early ring), which peaks 11 to 16 dB above the ring's loudness: over a grid of every knob setting from C1
 to C7, peaks run from -14.7 to -6.2 dBFS before the boost (median -9.5). With 1 dB, 1.5% of those renders touch the
 ceiling, by at most 0.8 dB, for a few samples; with 2 dB, 10%; with 3, 21%. Tried and dropped:
@@ -110,7 +111,7 @@ Blackfin build renders the grid bit for bit as the host does.
 ## How it was checked
 
 ```sh
-python ../open-xy/sdk.py test --machine machines/rings --cxx clang++ --host-cxx g++
+python ../open-xy/sdk.py test --machine machines/metal --cxx clang++ --host-cxx g++
 python tools/check_renders.py          # needs numpy
 python tools/gen_tables.py             # after changing a constant
 ```
@@ -171,7 +172,7 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
 Blackfin instructions per voice block, counted on the GNU Blackfin simulator running the SDK's own compiler output
 (the pinned GCC 8 fork, `-mcpu=bf707 -O2`; the simulator given the Blackfin+ 32-bit multiply it lacked), at 440 Hz:
 
-| Setting | rings | without the overflow guards | before the final pass | 2op FM |
+| Setting | Metal | without the overflow guards | before the final pass | 2op FM |
 | --- | --- | --- | --- | --- |
 | The defaults (MODES 2), a held note | 7,220 | 5,930 | 8,100 | 4,900 (its defaults) |
 | The defaults, while the drop runs (up to the first 90 ms) | 7,770 | 6,490 | 8,850 | |
@@ -212,5 +213,5 @@ audibly needs a listen on the device with more than eight notes ringing.
 
 ## Licensing
 
-rings is clean-room: written from measurement and analysis, with no Elektron code or data. No AGPL code (the SDK's
+Metal is clean-room: written from measurement and analysis, with no Elektron code or data. No AGPL code (the SDK's
 Timestretch) is used. The repository's LICENSE is the template's MIT notice; put your own name in it if you want.

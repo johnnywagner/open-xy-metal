@@ -1,7 +1,7 @@
 #pragma once
 #include <opxy/audio.hpp>
 
-namespace rings {
+namespace metal {
 using opxy::i32;
 using opxy::u32;
 
@@ -59,6 +59,6 @@ struct Voice {
     u32 pair;                // bit k: mode k is below VR/4 (input once per two); otherwise every voice sample
     u32 gx_dirty;
 };
-// rings voices share nothing.
+// metal voices share nothing.
 struct Shared {};
 }
