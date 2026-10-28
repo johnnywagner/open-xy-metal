@@ -1,0 +1,11 @@
+.lab-row{display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 4px;cursor:pointer}
+.lab-row input{accent-color:var(--blue);width:16px;height:16px;margin:0}
+.lab-label{font:11px var(--mono);letter-spacing:1px;color:var(--muted);margin:18px 0 8px}
+.lab-swatches{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:10px;padding:6px;background:#000;border-radius:4px}
+.lab-swatches button{aspect-ratio:1;padding:0;border:2px solid #000;border-radius:3px}
+.lab-swatches button[aria-pressed=true]{border-color:var(--blue);outline:1px solid #fff}
+.lab-colour{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lab-colour input{width:36px;height:28px;padding:0;border:1px solid var(--line);background:transparent;cursor:pointer}
+.lab-colour code{font:12px var(--mono)}
+.lab-markers{flex-wrap:wrap;margin-bottom:4px}.lab-markers button{flex:1;text-align:center}
+.lab-targets{margin:4px 0 8px}.lab-targets button{flex:1;text-align:center}.lab-targets[hidden]{display:none}
