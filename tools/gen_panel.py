@@ -16,7 +16,7 @@ import math
 from pathlib import Path
 
 RINGS, PIECES, ARC, MARK = 12, 10, 8, 8
-COLOUR = '#FFFFFF'                  # the rings' stroke and the markers' fill, #RRGGBB
+COLOUR = '#CDCDCD'                  # the rings' stroke and the markers' fill, #RRGGBB
 CORNER = 4                          # the rounded squares' corner radius, px of their 16 (0 square .. 8 round)
 WIDTHS = [0.375 * 1.405 ** i for i in range(12)]
 
