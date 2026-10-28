@@ -6,122 +6,122 @@
   <path id="metal_node_1" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_2" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_3" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_4" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_5" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_6" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_7" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_8" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_9" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_4" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_5" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_6" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_7" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_8" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_9" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_10" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_11" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_12" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_13" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_14" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_15" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_16" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_17" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_18" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_19" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_14" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_15" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_16" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_17" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_18" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_19" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_20" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_21" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_22" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_23" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_24" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_25" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_26" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_27" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_28" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_29" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_24" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_25" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_26" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_27" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_28" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_29" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_30" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_31" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_32" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_33" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_34" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_35" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_36" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_37" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_38" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_39" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_34" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_35" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_36" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_37" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_38" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_39" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_40" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_41" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_42" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_43" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_44" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_45" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_46" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_47" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_48" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_49" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_44" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_45" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_46" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_47" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_48" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_49" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_50" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_51" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_52" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_53" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_54" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_55" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_56" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_57" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_58" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_59" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_54" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_55" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_56" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_57" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_58" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_59" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_60" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_61" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_62" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_63" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_64" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_65" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_66" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_67" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_68" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_69" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_64" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_65" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_66" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_67" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_68" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_69" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_70" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_71" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_72" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_73" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_74" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_75" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_76" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_77" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_78" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_79" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_74" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_75" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_76" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_77" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_78" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_79" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_80" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_81" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_82" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_83" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_84" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_85" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_86" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_87" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_88" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_89" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_84" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_85" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_86" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_87" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_88" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_89" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_90" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_91" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_92" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_93" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_94" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_95" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_96" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_97" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_98" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_99" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_94" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_95" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_96" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_97" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_98" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_99" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_100" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_101" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_102" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_103" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_104" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_105" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_106" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_107" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_108" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_109" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_104" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_105" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_106" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_107" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_108" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_109" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <path id="metal_node_110" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_111" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_112" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="metal_node_113" transform="matrix(1 0 0 1 640 320)" d="M-8,0 L-7.85,-1.56 L-7.39,-3.06 L-6.65,-4.44 L-5.66,-5.66 L-4.44,-6.65 L-3.06,-7.39 L-1.56,-7.85 L0,-8" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="metal_node_114" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_115" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_116" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_117" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_118" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <path id="metal_node_119" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
+  <path id="metal_node_114" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_115" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_116" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_117" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_118" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
+  <path id="metal_node_119" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round"/>
   <!-- The node markers: four a ring, squares then circles. -->
   <path id="metal_node_120" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
   <path id="metal_node_121" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>

@@ -19,7 +19,7 @@ RINGS, PIECES, ARC, MARK = 12, 10, 8, 8
 COLOUR = '#FFFFFF'                  # the rings' stroke and the markers' fill, #RRGGBB
 # The straight pieces' line ends: 'square' as the screen had them, 'round' to try rounding the boxes the OP-XY draws
 # (whether it draws line ends at all is not known; its boxes so far show flat ends, unextended).
-ENDS = 'square'
+ENDS = 'round'
 WIDTHS = [0.375 * 1.405 ** i for i in range(12)]
 
 def num(v):
