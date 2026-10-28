@@ -80,8 +80,11 @@ const i32 CHAIN_MOST = 40;             // pixels: no ring is pushed further
 const i32 CHAIN_FASTEST = 1000;        // pixels a second: nor moves faster
 const i32 PIECES = 10;                 // nodes per ring: the outline's 10 (gen_panel.py)
 const i32 ROUNDING = 205;              // Q10: the corners, round at 0, square at 1
-// The palette's first twelve: white strokes 0.375 px x 1.405^i wide, Q10 (tools/gen_panel.py). A piece drawn at scale
-// s takes the widest within 1.133 of the width it should show divided by s, so every piece shows within 19 % of it.
+// The palette's first twelve: strokes 0.375 px x 1.405^i wide, Q10 (tools/gen_panel.py). A piece takes the widest
+// within 1.133 of the width it should show, so it shows within 19 % of it: unscaled when THIN_LINES (the OP-XY draws
+// a stroke at its palette width whatever the piece's scale, so every line shows thin, as intended), else divided by
+// the piece's scale s (the browser's way, which the OP-XY draws as boxes where pieces are short: the node markers).
+const bool THIN_LINES = true;
 const i32 WIDTHS[12] = {384, 540, 758, 1065, 1496, 2102, 2954, 4150, 5831, 8193, 11511, 16172};
 const i32 SMALLEST = 90;               // Q10: below this scale a piece would need a stroke wider than the palette's
 // The node markers. The OP-XY draws a stroke at its palette entry's width whatever the piece's scale (and ignores line
@@ -93,7 +96,7 @@ const i32 SMALLEST = 90;               // Q10: below this scale a piece would ne
 // put a filled rounded square (turned, for DIAMOND) the box's mean side across where a box is no more than MARKER_LONG
 // times as long as it is thick, over a thin line; longer boxes stay.
 enum Marker { ORIGINAL, ROUNDED, SQUARE, DIAMOND };
-const u32 MARKER = ROUNDED;            // the OP-XY's; the browser lab can choose another
+const u32 MARKER = ORIGINAL;           // the OP-XY's (only with THIN_LINES off); the browser lab can choose another
 const i32 MARKER_LONG = 2560;          // Q10: 2.5 x
 const i32 ROUND_LEAST = 3 * unit;      // Q10 pixels
 const u32 MARKER_FILL = 12;            // the palette's marker fill
@@ -148,12 +151,15 @@ inline u32 stroke_for(i32 s, i32 width) {
     return entry;
 }
 
+// The palette entry for a piece at scale s that should show `width`: THIN_LINES, or making up for s.
+inline u32 width_for(i32 s, i32 width) { return stroke_for(THIN_LINES ? unit : s, width); }
+
 // A straight piece of `length` (Q10 pixels) centred at (x, y); vertical, or across when `across`. The vertical pieces
 // are drawn 64 pixels long, the ones across 32. Returns its scale.
 template <class F>
 inline i32 straight(F& frame, u32 node, i32 x, i32 y, i32 length, bool across, i32 width) {
     const i32 s = clamp(across ? length >> 5 : length >> 6, SMALLEST, 2 * unit);
-    place(frame, node, x, y, s, stroke_for(s, width), stroke);
+    place(frame, node, x, y, s, width_for(s, width), stroke);
     if (across) turn(frame, node, rotation(900));
     return s;
 }
@@ -215,7 +221,7 @@ void ring(F& frame, u32 index, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 width, u
     if (s < SMALLEST) {
         for (u32 i = 0; i < 4; ++i) hide(frame, first + i);
     } else {
-        const u32 shade = stroke_for(s, width);
+        const u32 shade = width_for(s, width);
         const i32 xs[4] = {cx - ax, cx + ax, cx + ax, cx - ax}, ys[4] = {cy - by, cy - by, cy + by, cy + by};
         for (u32 i = 0; i < 4; ++i) {
             place(frame, first + i, xs[i], ys[i], s, shade, stroke);

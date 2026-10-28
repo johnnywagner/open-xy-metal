@@ -8,8 +8,9 @@ Twelve rings of 10 pieces each (node 10 r + i): four quarter arcs of radius 8, f
 (display.cpp turns them for the other corners); four vertical pieces 64 px long; two 32 px long that display.cpp turns
 across. Then 96 filled squares 16 px wide with corners rounded CORNER px, two for each of a ring's four boxes (node
 120 + 8 r + 2 i + e: top, bottom, left, right; each end): they round the ends of the boxes the OP-XY draws, or one
-stands in for a box as a marker (display.cpp turns it for a diamond). All start parked off screen. The palette: twelve white strokes 0.375 px x 1.405^i wide (display.cpp gives each
-piece the one that undoes its scale; WIDTHS there is this table in Q10), then the markers' fill. Every stroke is COLOUR: try others live in the
+stands in for a box as a marker (display.cpp turns it for a diamond). All start parked off screen. The palette: twelve strokes 0.375 px x 1.405^i wide (display.cpp gives each
+piece the one that shows its width, on the OP-XY or in the browser; WIDTHS there is this table in Q10), then the markers'
+fill. Every stroke is COLOUR: try others live in the
 screen lab (tools/screen_lab.py), then set it here and rerun this.
 """
 import math

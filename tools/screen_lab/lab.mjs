@@ -14,7 +14,7 @@
 import { PreviewDisplay, SvgDisplay } from '/sdk/browser/display.mjs';
 
 const KEY = 'metal-screen-lab';
-const MARKERS = ['Original', 'Rounded', 'Square', 'Diamond'], BUILT = 1;
+const MARKERS = ['Original', 'Rounded', 'Square', 'Diamond'], BUILT = 0;
 const CORNER_BUILT = 4, ROUNDS = 120;
 const SWATCHES = [['#FFFFFF', 'White'], ['#F4F1EA', 'Ivory'], ['#EDE8DC', 'Bone'], ['#E8E6DF', 'Paper'],
                   ['#DCDAD3', 'Stone'], ['#CDCDCD', 'Stock grey'], ['#C4C4C0', 'Silver'], ['#A8A8A4', 'Grey']];
