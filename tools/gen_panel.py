@@ -6,9 +6,9 @@ repository root:
 
 Twelve rings of 10 pieces each (node 10 r + i): four quarter arcs of radius 8, from the left round to the top
 (display.cpp turns them for the other corners); four vertical pieces 64 px long; two 32 px long that display.cpp turns
-across. Then the node markers, four a ring (node 120 + 4 r + i: top, bottom, left, right): 48 filled squares 16 px wide
-(display.cpp turns them for diamonds), then 48 filled circles 16 px across (node 168 + 4 r + i). All start parked off
-screen. The palette: twelve white strokes 0.375 px x 1.405^i wide (display.cpp gives each
+across. Then 96 filled squares 16 px wide with corners rounded CORNER px, two for each of a ring's four boxes (node
+120 + 8 r + 2 i + e: top, bottom, left, right; each end): they round the ends of the boxes the OP-XY draws, or one
+stands in for a box as a marker (display.cpp turns it for a diamond). All start parked off screen. The palette: twelve white strokes 0.375 px x 1.405^i wide (display.cpp gives each
 piece the one that undoes its scale; WIDTHS there is this table in Q10), then the markers' fill. Every stroke is COLOUR: try others live in the
 screen lab (tools/screen_lab.py), then set it here and rerun this.
 """
@@ -17,9 +17,7 @@ from pathlib import Path
 
 RINGS, PIECES, ARC, MARK = 12, 10, 8, 8
 COLOUR = '#FFFFFF'                  # the rings' stroke and the markers' fill, #RRGGBB
-# The straight pieces' line ends: 'square' as the screen had them, 'round' to try rounding the boxes the OP-XY draws
-# (whether it draws line ends at all is not known; its boxes so far show flat ends, unextended).
-ENDS = 'round'
+CORNER = 4                          # the rounded squares' corner radius, px of their 16 (0 square .. 8 round)
 WIDTHS = [0.375 * 1.405 ** i for i in range(12)]
 
 def num(v):
@@ -28,6 +26,19 @@ def num(v):
 
 def path(pts):
     return 'M' + ' L'.join(f'{num(x)},{num(y)}' for x, y in pts)
+
+def rounded(radius):
+    """A square 2 MARK wide with corners of `radius`, each four straight steps; every point distinct."""
+    c, pts = MARK - radius, []
+    for cx, cy, start in ((c, -c, -90), (c, c, 0), (-c, c, 90), (-c, -c, 180)):
+        for k in range(5):
+            t = math.radians(start + k * 90 / 4)
+            pt = (round(cx + radius * math.cos(t), 2), round(cy + radius * math.sin(t), 2))
+            if not pts or pt != pts[-1]:
+                pts.append(pt)
+    if pts[-1] == pts[0]:
+        pts.pop()
+    return path(pts) + ' Z'
 
 def arc():
     return path([(-ARC * math.cos(math.radians(t)), -ARC * math.sin(math.radians(t))) for t in [i * 90 / 8 for i in range(9)]])
@@ -42,18 +53,15 @@ for r in range(RINGS):
         if i < 4:
             d, cap = arc(), 'round" stroke-linejoin="round'
         elif i < 8:
-            d, cap = 'M0,-32 L0,32', ENDS
+            d, cap = 'M0,-32 L0,32', 'square'
         else:
-            d, cap = 'M0,-16 L0,16', ENDS
+            d, cap = 'M0,-16 L0,16', 'square'
         out.append(f'  <path id="metal_node_{n}" {PARK} d="{d}" fill="none" stroke="{COLOUR}" stroke-width="1.3" '
                    f'stroke-linecap="{cap}"/>')
-out.append('  <!-- The node markers: four a ring, squares then circles. -->')
-for shape in ('square', 'circle'):
-    for n in range(RINGS * 4):
-        node = RINGS * PIECES + (0 if shape == 'square' else RINGS * 4) + n
-        art = (f'path id="metal_node_{node}" {PARK} d="M-{MARK},-{MARK} L{MARK},-{MARK} L{MARK},{MARK} L-{MARK},{MARK} Z"'
-               if shape == 'square' else f'circle id="metal_node_{node}" {PARK} cx="0" cy="0" r="{MARK}"')
-        out.append(f'  <{art} fill="{COLOUR}" stroke="{COLOUR}" stroke-width="1" stroke-linejoin="miter"/>')
+out.append(f'  <!-- Rounded squares: two for each of a ring\'s four boxes, corners {CORNER} px. -->')
+for n in range(RINGS * 8):
+    out.append(f'  <path id="metal_node_{RINGS * PIECES + n}" {PARK} d="{rounded(CORNER)}" fill="{COLOUR}" '
+               f'stroke="{COLOUR}" stroke-width="1" stroke-linejoin="round"/>')
 out.append(f'  <!-- The palette: twelve {COLOUR} strokes, 0.375 px x 1.405^i wide. -->')
 for i, w in enumerate(WIDTHS):
     out.append(f'  <circle id="metal_palette_{i}" {PARK} cx="0" cy="0" r="1" fill="#000000" stroke="{COLOUR}" '

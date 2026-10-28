@@ -84,17 +84,20 @@ const i32 ROUNDING = 205;              // Q10: the corners, round at 0, square a
 // s takes the widest within 1.133 of the width it should show divided by s, so every piece shows within 19 % of it.
 const i32 WIDTHS[12] = {384, 540, 758, 1065, 1496, 2102, 2954, 4150, 5831, 8193, 11511, 16172};
 const i32 SMALLEST = 90;               // Q10: below this scale a piece would need a stroke wider than the palette's
-// The node markers. The OP-XY draws a stroke at its palette entry's width whatever the piece's scale, so a short
-// straight piece shows there as a box: its drawn length along the ring's edge and the palette's width across it
-// (measured from photos and video of the device). Where a ring's top, bottom or side shows such a box no more than
-// MARKER_LONG times as long as it is thick, a marker can take its place: a filled square, diamond or circle the box's
-// mean side across, over a thin line. A longer box (a stub across a thin ring, a bar along a squashed one) stays.
-// ORIGINAL draws only the pieces, as the screen always has.
-enum Marker { ORIGINAL, SQUARE, DIAMOND, CIRCLE };
-const u32 MARKER = ORIGINAL;           // the OP-XY's; the browser lab can choose another
+// The node markers. The OP-XY draws a stroke at its palette entry's width whatever the piece's scale (and ignores line
+// ends), so a short straight piece shows there as a box: its drawn length along the ring's edge and the palette's width
+// across it (measured from photos and video of the device). ORIGINAL draws only the pieces, as the screen always has.
+// ROUNDED rounds each box's corners: its ends become rounded squares (gen_panel.py's CORNER) as thick as the box, with
+// the box's own stroke between them, shortened; a box thicker than long is two rounded squares as wide as it is long.
+// Boxes thinner than ROUND_LEAST (the ring's own lines) or under half as long as thick (stubs) stay. SQUARE and DIAMOND
+// put a filled rounded square (turned, for DIAMOND) the box's mean side across where a box is no more than MARKER_LONG
+// times as long as it is thick, over a thin line; longer boxes stay.
+enum Marker { ORIGINAL, ROUNDED, SQUARE, DIAMOND };
+const u32 MARKER = ROUNDED;            // the OP-XY's; the browser lab can choose another
 const i32 MARKER_LONG = 2560;          // Q10: 2.5 x
+const i32 ROUND_LEAST = 3 * unit;      // Q10 pixels
 const u32 MARKER_FILL = 12;            // the palette's marker fill
-const u32 SQUARES = 120, CIRCLES = 168;   // their first nodes: four a ring (top, bottom, left, right), 16 px across
+const u32 ROUNDS = 120;                // the first rounded square: eight a ring, two for each box, 16 px across
 
 // Q10 fraction of a Q31 knob word.
 inline i32 fraction(i32 word) { return clamp(word, 0, 0x7fffffff) >> 21; }
@@ -155,24 +158,50 @@ inline i32 straight(F& frame, u32 node, i32 x, i32 y, i32 length, bool across, i
     return s;
 }
 
-// Node marker n (4 a ring) in place of the box the OP-XY draws at (x, y), `length` along the ring's edge and `thick`
-// across it (Q10 pixels), or none: true if it takes the box's place.
+// A rounded square `side` across (Q10 pixels, its 1 px edge included) at (x, y), filled.
 template <class F>
-inline bool mark(F& frame, u32 n, u32 marker, i32 x, i32 y, i32 length, i32 thick) {
+inline void rounded(F& frame, u32 node, i32 x, i32 y, i32 side) {
+    place(frame, node, x, y, clamp((side - unit) >> 4, SMALLEST, 2 * unit), MARKER_FILL, fill_and_stroke);
+}
+
+// One of a ring's boxes as the OP-XY draws it: centred at (x, y), `length` along the ring's edge (across the screen
+// when `across`, else down it) and palette entry `entry`'s width across it, Q10 pixels, from pieces `one` and `two`
+// (the same piece for the top or bottom). Draws the marker, or its rounded ends, with rounded squares n and n + 1.
+template <class F>
+inline void box(F& frame, u32 n, u32 marker, i32 x, i32 y, bool across, i32 length, u32 entry, u32 one, u32 two,
+                i32 width) {
+    hide(frame, n);
+    hide(frame, n + 1);
+    const i32 thick = WIDTHS[entry];
     const i32 most = length > thick ? length : thick, least = length > thick ? thick : length;
-    if (marker == ORIGINAL || (most << 10) > MARKER_LONG * least) {
-        hide(frame, SQUARES + n);
-        hide(frame, CIRCLES + n);
-        return false;
+    if (marker == ROUNDED) {
+        if (thick < ROUND_LEAST || 2 * length < thick) return;
+        // the two ends: rounded squares `end` across, `apart` either side of the middle along the long way
+        const bool lengthwise = length >= thick;
+        const i32 end = lengthwise ? thick : length, apart = (most - end) >> 1;
+        const bool sideways = across == lengthwise;            // apart across the screen
+        rounded(frame, n, sideways ? x - apart : x, sideways ? y : y - apart, end);
+        rounded(frame, n + 1, sideways ? x + apart : x, sideways ? y : y + apart, end);
+        // between them, the box's own stroke, shortened to reach from one end's middle to the other's
+        if (two != one) hide(frame, two);
+        if (!lengthwise || length < 2 * thick) {
+            hide(frame, one);
+            return;
+        }
+        const i32 core = length - thick;
+        place(frame, one, x, y, clamp(across ? core >> 5 : core >> 6, SMALLEST, 2 * unit), entry, stroke);
+        if (across) turn(frame, one, rotation(900));
+        return;
     }
-    const i32 size = (length + thick) >> 1;            // across, Q10 pixels
-    hide(frame, marker == CIRCLE ? SQUARES + n : CIRCLES + n);
+    if (marker == ORIGINAL || (most << 10) > MARKER_LONG * least) return;
     // The artwork is 16 px across; a diamond (the square turned) is 1.25 x the size from point to point, of 16 x 2^1/2.
-    const i32 s = clamp(marker == DIAMOND ? (size * 57) >> 10 : size >> 4, SMALLEST, 2 * unit);
-    const u32 node = marker == CIRCLE ? CIRCLES + n : SQUARES + n;
-    place(frame, node, x, y, s, MARKER_FILL, fill_and_stroke);
-    if (marker == DIAMOND) turn(frame, node, rotation(450));
-    return true;
+    const i32 size = (length + thick) >> 1;
+    place(frame, n, x, y, clamp(marker == DIAMOND ? (size * 57) >> 10 : size >> 4, SMALLEST, 2 * unit), MARKER_FILL,
+          fill_and_stroke);
+    if (marker == DIAMOND) turn(frame, n, rotation(450));
+    // the pieces under it thin: in the stroke that shows `width` wide unscaled, as the OP-XY draws it
+    shade(frame, one, stroke_for(unit, width), stroke);
+    shade(frame, two, stroke_for(unit, width), stroke);
 }
 
 // Ring `index`: centre (cx, cy), half width a, half height b, corner radius r, all Q10 pixels. Its pieces in order:
@@ -202,18 +231,13 @@ void ring(F& frame, u32 index, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 width, u
     }
     const i32 over = straight(frame, first + 8, cx, cy - b, 2 * ax, true, width);
     straight(frame, first + 9, cx, cy + b, 2 * ax, true, width);
-    // The markers, over the OP-XY's boxes: across the top and bottom, and each side's two pieces together. A piece
-    // under one is drawn thin: in the stroke that shows `width` wide unscaled, as the OP-XY draws it.
-    const u32 n = index * 4, thin = stroke_for(unit, width);
-    const i32 along = 32 * over, sides = side + 64 * down;   // Q10 pixels
-    const i32 thick = WIDTHS[stroke_for(over, width)], side_thick = WIDTHS[stroke_for(down, width)];
-    if (mark(frame, n, marker, cx, cy - b, along, thick)) shade(frame, first + 8, thin, stroke);
-    if (mark(frame, n + 1, marker, cx, cy + b, along, thick)) shade(frame, first + 9, thin, stroke);
-    for (u32 j = 0; j < 2; ++j) {
-        if (!mark(frame, n + 2 + j, marker, j ? cx + a : cx - a, cy, sides, side_thick)) continue;
-        shade(frame, first + 4 + 2 * j, thin, stroke);
-        shade(frame, first + 5 + 2 * j, thin, stroke);
-    }
+    // The boxes the OP-XY draws: across the top and bottom, and each side's two pieces together.
+    const u32 n = ROUNDS + index * 8, top = stroke_for(over, width), sides = stroke_for(down, width);
+    box(frame, n, marker, cx, cy - b, true, 32 * over, top, first + 8, first + 8, width);
+    box(frame, n + 2, marker, cx, cy + b, true, 32 * over, top, first + 9, first + 9, width);
+    for (u32 j = 0; j < 2; ++j)
+        box(frame, n + 4 + 2 * j, marker, j ? cx + a : cx - a, cy, false, side + 64 * down, sides, first + 4 + 2 * j,
+            first + 5 + 2 * j, width);
 }
 } // namespace
 

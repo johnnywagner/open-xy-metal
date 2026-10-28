@@ -3,41 +3,63 @@
 //   ends; the workbench shrinks the stroke with the piece. So a short straight piece, which display.cpp shrinks and
 //   gives a wide stroke to make up for it, shows on the device as a box: its drawn length long and the palette's
 //   width thick. Measured against photos and video of the device (settings 11 77 99 58, 0 0 99 0, a strike at
-//   0 65 93 73); not documented by the SDK. Its ends looked flat in those, so the look draws every end flat, unless
-//   "OP-XY draws line ends" is on (a guess to try against the device: the artwork's ends, ENDS in tools/gen_panel.py).
+//   0 65 93 73); not documented by the SDK. It ignores line ends (a build with round ones drew the same), so the look
+//   draws every end flat.
 // - Colour: strokes every piece in a colour other than the artwork's (COLOUR in tools/gen_panel.py), to try shades
-//   before setting one there. '' keeps the artwork's. With the skew on, DROP moves it from colour A (DROP 0) to colour
-//   B (DROP 99), mixed channel by channel: browser only, since the OP-XY's 16 palette entries hold one colour for
-//   each of the twelve stroke widths.
+//   before setting one there. '' keeps the artwork's.
 // - Markers: the node markers' shape (display.cpp, Marker), through the lab's bits 122-123 (bits 29-30 of parameter
 //   slot 7), counted on from MARKER there; BUILT is that MARKER. The OP-XY leaves the slot at 0: MARKER.
+// - Corners: the rounded squares' corner radius, redrawn in the browser (CORNER in tools/gen_panel.py, mirrored by
+//   rounded() here; CORNER_BUILT is it). null keeps the artwork's.
 import { PreviewDisplay, SvgDisplay } from '/sdk/browser/display.mjs';
 
 const KEY = 'metal-screen-lab';
-const MARKERS = ['Original', 'Square', 'Diamond', 'Circle'], BUILT = 0;
+const MARKERS = ['Original', 'Rounded', 'Square', 'Diamond'], BUILT = 1;
+const CORNER_BUILT = 4, ROUNDS = 120;
 const SWATCHES = [['#FFFFFF', 'White'], ['#F4F1EA', 'Ivory'], ['#EDE8DC', 'Bone'], ['#E8E6DF', 'Paper'],
-                  ['#DCDAD3', 'Stone'], ['#D9D9D6', 'Pale grey'], ['#C4C4C0', 'Silver'], ['#A8A8A4', 'Grey']];
-const settings = { device: true, ends: false, colour: '', colourB: '#A8A8A4', skew: false, editing: 'A', marker: BUILT };
+                  ['#DCDAD3', 'Stone'], ['#CDCDCD', 'Stock grey'], ['#C4C4C0', 'Silver'], ['#A8A8A4', 'Grey']];
+const settings = { device: true, corner: null, colour: '', marker: BUILT };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch {} };
 
-let drop = 0;                                        // DROP, 0 .. 1, as last drawn
 const tick = PreviewDisplay.prototype.tick;
 PreviewDisplay.prototype.tick = function (input, ...rest) {
-  drop = input.slots[0] / 0x7fffffff;
   const slots = [...input.slots];
   slots[7] = (slots[7] & ~(3 << 29)) | (((settings.marker - BUILT) & 3) << 29);
   return tick.call(this, { ...input, slots }, ...rest);
 };
 
-// Each node's authored ends, and the stroke width and colours its palette entry last lent it.
-const ends = new WeakMap(), widths = new WeakMap(), strokes = new WeakMap(), fills = new WeakMap();
+// gen_panel.py's rounded(): a square 16 px wide with corners of `radius`, each four straight steps.
+function rounded(radius) {
+  const c = 8 - radius, pts = [];
+  for (const [cx, cy, start] of [[c, -c, -90], [c, c, 0], [-c, c, 90], [-c, -c, 180]]) {
+    for (let k = 0; k < 5; k++) {
+      const t = (start + k * 22.5) * Math.PI / 180;
+      const pt = [+(cx + radius * Math.cos(t)).toFixed(2), +(cy + radius * Math.sin(t)).toFixed(2)];
+      const last = pts[pts.length - 1];
+      if (!last || last[0] !== pt[0] || last[1] !== pt[1]) pts.push(pt);
+    }
+  }
+  if (pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts.pop();
+  return 'M' + pts.map(([x, y]) => `${x},${y}`).join(' L') + ' Z';
+}
+
+// Each node's authored ends and outline, and the stroke width and colours its palette entry last lent it.
+const outlines = new WeakMap(), ends = new WeakMap(), widths = new WeakMap(), strokes = new WeakMap(), fills = new WeakMap();
 let authored = '';                                   // the artwork's colour, from its first palette entry
 const apply = SvgDisplay.prototype.apply;
 SvgDisplay.prototype.apply = function (frame) {
   apply.call(this, frame);
   if (!authored) { authored = this.palette[0].stroke.toUpperCase(); showColour(); }
-  const colour = drawn();
+  const colour = settings.colour;
+  const corner = settings.corner ?? CORNER_BUILT;
+  if (this.corner !== corner) {
+    for (const node of this.nodes.slice(ROUNDS)) {
+      if (!outlines.has(node)) outlines.set(node, node.getAttribute('d'));
+      node.setAttribute('d', settings.corner === null ? outlines.get(node) : rounded(corner));
+    }
+    this.corner = corner;
+  }
   for (let i = 0; i < this.nodes.length; i++) {
     const node = this.nodes[i], offset = this.nodesAt + i * 7;
     const scale = frame[offset + 2], shade = frame[offset + 5], paint = frame[offset + 6];
@@ -49,7 +71,7 @@ SvgDisplay.prototype.apply = function (frame) {
     const width = widths.get(node) ?? Number(node.getAttribute('stroke-width'));
     if (settings.device) {
       node.setAttribute('stroke-width', String(width * 1024 / scale));   // undoes the node's scale
-      node.setAttribute('stroke-linecap', settings.ends && ends.get(node) ? ends.get(node) : 'butt');
+      node.setAttribute('stroke-linecap', 'butt');
     } else {
       node.setAttribute('stroke-width', String(width));
       if (ends.get(node)) node.setAttribute('stroke-linecap', ends.get(node));
@@ -63,15 +85,13 @@ panel.innerHTML = `<p class="eyebrow">METAL SCREEN LAB</p><h3>Screen</h3>
   <label class="lab-row"><input type="checkbox" id="lab-device"> OP-XY look</label>
   <p class="hint">Draws strokes as the OP-XY does: a shrunk piece keeps its full stroke width, so short pieces show as
   boxes. Off: as the workbench draws them.</p>
-  <label class="lab-row"><input type="checkbox" id="lab-ends"> OP-XY draws line ends</label>
-  <p class="hint">A guess to check on the device: with the look on, draw the artwork's line ends (round or square)
-  instead of flat ones.</p>
   <p class="lab-label">Node markers</p>
   <div class="lab-markers segmented"></div>
   <p class="hint" id="lab-marker-note"></p>
+  <label class="lab-row lab-corner">Corners <input type="range" id="lab-corner" min="0" max="8" step="0.5"
+  aria-label="Corner radius"><code id="lab-corner-out"></code></label>
+  <p class="hint" id="lab-corner-note"></p>
   <p class="lab-label">Colour</p>
-  <label class="lab-row"><input type="checkbox" id="lab-skew"> DROP skews colour A to B</label>
-  <div class="lab-targets segmented"><button type="button" data-target="A">A</button><button type="button" data-target="B">B</button></div>
   <div class="lab-swatches"></div>
   <div class="lab-colour"><input type="color" id="lab-colour" aria-label="Ring colour"><code id="lab-hex"></code>
   <button type="button" id="lab-reset" class="text-button">Use the artwork's</button></div>
@@ -80,17 +100,26 @@ document.querySelector('aside').prepend(panel);
 const device = panel.querySelector('#lab-device');
 device.checked = settings.device;
 device.addEventListener('change', () => { settings.device = device.checked; save(); });
-const ends_ = panel.querySelector('#lab-ends');
-ends_.checked = settings.ends;
-ends_.addEventListener('change', () => { settings.ends = ends_.checked; save(); });
+const corner = panel.querySelector('#lab-corner');
+function showCorner() {
+  const value = settings.corner ?? CORNER_BUILT;
+  corner.value = value;
+  panel.querySelector('#lab-corner-out').textContent = `${value} px`;
+  panel.querySelector('#lab-corner-note').textContent = value === CORNER_BUILT
+    ? `Of the rounded squares' 16 px (0 square, 8 round): the artwork's, CORNER in tools/gen_panel.py.`
+    : `Trying ${value} of 16 px. To keep it, set CORNER = ${value} in tools/gen_panel.py.`;
+}
+corner.addEventListener('input', () => { settings.corner = +corner.value; save(); showCorner(); });
+showCorner();
 
 const markers = panel.querySelector('.lab-markers');
 function showMarker() {
   for (const button of markers.children) button.setAttribute('aria-pressed', String(+button.dataset.marker === settings.marker));
   panel.querySelector('#lab-marker-note').textContent = settings.marker === BUILT
     ? `${MARKERS[BUILT]}: as the OP-XY draws it now.`
-    : `Near-square boxes become ${MARKERS[settings.marker].toLowerCase()}s; long bars and stubs stay. To keep it, set ` +
-      `MARKER = ${MARKERS[settings.marker].toUpperCase()} in display.cpp.`;
+    : (settings.marker === 1 ? 'The boxes keep their size and motion, with rounded corners; thin lines and stubs stay.'
+      : `Near-square boxes become ${MARKERS[settings.marker].toLowerCase()}s; long bars and stubs stay.`) +
+      ` To keep it, set MARKER = ${MARKERS[settings.marker].toUpperCase()} in display.cpp.`;
 }
 MARKERS.forEach((name, i) => {
   const button = document.createElement('button');
@@ -102,38 +131,17 @@ MARKERS.forEach((name, i) => {
 });
 showMarker();
 
-// The colour drawn now: '' for the artwork's own, A, or with the skew on A mixed into B by DROP.
-const hex = colour => [1, 3, 5].map(i => parseInt(colour.slice(i, i + 2), 16));
-function drawn() {
-  if (!settings.skew) return settings.colour;
-  const a = hex(settings.colour || authored || '#FFFFFF'), b = hex(settings.colourB || authored || '#FFFFFF');
-  return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * drop).toString(16).padStart(2, '0')).join('').toUpperCase();
-}
-
 const picker = panel.querySelector('#lab-colour'), swatches = panel.querySelector('.lab-swatches');
-const skew = panel.querySelector('#lab-skew'), targets = panel.querySelector('.lab-targets');
-const editing = () => settings.skew ? settings.editing : 'A';
 function showColour() {
-  const b = editing() === 'B', colour = (b ? settings.colourB : settings.colour) || authored || '#FFFFFF';
+  const colour = settings.colour || authored || '#FFFFFF';
   picker.value = colour.toLowerCase();
-  panel.querySelector('#lab-hex').textContent = `${settings.skew ? editing() + ' ' : ''}${colour}`;
-  panel.querySelector('#lab-reset').hidden = b;
-  targets.hidden = !settings.skew;
-  for (const button of targets.children) button.setAttribute('aria-pressed', String(button.dataset.target === editing()));
-  const a = settings.colour || authored || '#FFFFFF';
-  panel.querySelector('#lab-note').textContent = settings.skew
-    ? `DROP 0 draws ${a}, DROP 99 ${settings.colourB || a}. Browser only: the OP-XY's palette has no room for a ` +
-      `colour per DROP step at every stroke width.`
-    : settings.colour && settings.colour !== authored
+  panel.querySelector('#lab-hex').textContent = colour;
+  panel.querySelector('#lab-note').textContent = settings.colour && settings.colour !== authored
     ? `Trying ${settings.colour}. To keep it, set COLOUR = '${settings.colour}' in tools/gen_panel.py.`
     : `The artwork's colour${authored ? ` (${authored}, COLOUR in tools/gen_panel.py)` : ''}.`;
   for (const button of swatches.children) button.setAttribute('aria-pressed', String(button.dataset.colour === colour));
 }
-const choose = colour => {
-  const value = colour ? colour.toUpperCase() : '';
-  if (editing() === 'B') settings.colourB = value || settings.colourB; else settings.colour = value;
-  save(); showColour();
-};
+const choose = colour => { settings.colour = colour ? colour.toUpperCase() : ''; save(); showColour(); };
 for (const [colour, name] of SWATCHES) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -146,9 +154,4 @@ for (const [colour, name] of SWATCHES) {
 }
 picker.addEventListener('input', () => choose(picker.value));
 panel.querySelector('#lab-reset').addEventListener('click', () => choose(''));
-skew.checked = settings.skew;
-skew.addEventListener('change', () => { settings.skew = skew.checked; save(); showColour(); });
-for (const button of targets.children) {
-  button.addEventListener('click', () => { settings.editing = button.dataset.target; save(); showColour(); });
-}
 showColour();

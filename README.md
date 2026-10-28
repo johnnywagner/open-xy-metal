@@ -18,7 +18,7 @@ The port kit keeps the prototype's name: its engine is `rings.c`.
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
 | [tools/gen_tables.py](tools/gen_tables.py) | Generates `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
 | [tools/gen_panel.py](tools/gen_panel.py) | Generates the screen's artwork, `panel.svg.fragment`: the pieces of the twelve rings and the stroke palette `display.cpp` uses |
-| [tools/screen_lab.py](tools/screen_lab.py) | The SDK's workbench with a screen lab panel (browser only): the OP-XY look, which draws strokes as the device does (a shrunk piece keeps its full stroke width); the node markers' shape; the colour |
+| [tools/screen_lab.py](tools/screen_lab.py) | The SDK's workbench with a screen lab panel (browser only): the OP-XY look, which draws strokes as the device does (a shrunk piece keeps its full stroke width); the node markers' shape and corners; the colour |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
 | [tools/probe.c](tools/probe.c) | The float reference with every stage exposed, for levels and debugging |
 
