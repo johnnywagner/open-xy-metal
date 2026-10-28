@@ -11,6 +11,7 @@
 // ring pulses, wider and narrower and out and in, at a rate that rises with its mode and dies away with its ring
 // time. And each ring can bob up and down on its own, each at its own rate: on every note (dying away), or all the
 // time. And the rings are squashed across DROP, held, with each strike's on top. Screen v37 (the lab's save C9).
+// Where the OP-XY draws a ring's short straight pieces as boxes, node markers can take their place (MARKER).
 #include "display.h"
 #include "display_tables.h"
 
@@ -33,7 +34,8 @@ const i32 TALLEST = 95;                // half the drawing's height
 //     (bit 106);
 //   then the choices, each 0 for the one here: bit 113 the bob's other timing; bit 114 the squash's other direction;
 //   bit 115 its other timing; bits 116-117 what a strike does to a held squash, counted on from the one here; bit 118
-//   its other settling; bit 119 the chain's other ends; bits 120-121 where a strike kicks it, counted on likewise.
+//   its other settling; bit 119 the chain's other ends; bits 120-121 where a strike kicks it, counted on likewise;
+//   bits 122-123 the node markers' shape, counted on likewise.
 enum Setting { KICK_SET, PASS_SET, WIGGLE_SET, RINGOUT_SET, PULSE_SET, STRIKE_SIZE_SET, BOB_DEPTH_SET, BOB_SPEED_SET,
                SPACE_DEPTH_SET, SQUASH_DEPTH_SET, SQUASH_KICK_SET, SQUASH_TIME_SET, SWING_DEPTH_SET, COIL_SET,
                HEIGHT_SET, SQUASH_HEIGHT_SET, PEAK_LOW_SET, PEAK_HIGH_SET, WIDTH_LOW_SET, WIDTH_HIGH_SET };
@@ -82,6 +84,17 @@ const i32 ROUNDING = 205;              // Q10: the corners, round at 0, square a
 // s takes the widest within 1.133 of the width it should show divided by s, so every piece shows within 19 % of it.
 const i32 WIDTHS[12] = {384, 540, 758, 1065, 1496, 2102, 2954, 4150, 5831, 8193, 11511, 16172};
 const i32 SMALLEST = 90;               // Q10: below this scale a piece would need a stroke wider than the palette's
+// The node markers. The OP-XY draws a stroke at its palette entry's width whatever the piece's scale, so a short
+// straight piece shows there as a box: its drawn length along the ring's edge and the palette's width across it
+// (measured from photos and video of the device). Where a ring's top, bottom or side shows such a box no more than
+// MARKER_LONG times as long as it is thick, a marker can take its place: a filled square, diamond or circle the box's
+// mean side across, over a thin line. A longer box (a stub across a thin ring, a bar along a squashed one) stays.
+// ORIGINAL draws only the pieces, as the screen always has.
+enum Marker { ORIGINAL, SQUARE, DIAMOND, CIRCLE };
+const u32 MARKER = ORIGINAL;           // the OP-XY's; the browser lab can choose another
+const i32 MARKER_LONG = 2560;          // Q10: 2.5 x
+const u32 MARKER_FILL = 12;            // the palette's marker fill
+const u32 SQUARES = 120, CIRCLES = 168;   // their first nodes: four a ring (top, bottom, left, right), 16 px across
 
 // Q10 fraction of a Q31 knob word.
 inline i32 fraction(i32 word) { return clamp(word, 0, 0x7fffffff) >> 21; }
@@ -133,19 +146,41 @@ inline u32 stroke_for(i32 s, i32 width) {
 }
 
 // A straight piece of `length` (Q10 pixels) centred at (x, y); vertical, or across when `across`. The vertical pieces
-// are drawn 64 pixels long, the ones across 32.
+// are drawn 64 pixels long, the ones across 32. Returns its scale.
 template <class F>
-inline void straight(F& frame, u32 node, i32 x, i32 y, i32 length, bool across, i32 width) {
+inline i32 straight(F& frame, u32 node, i32 x, i32 y, i32 length, bool across, i32 width) {
     const i32 s = clamp(across ? length >> 5 : length >> 6, SMALLEST, 2 * unit);
     place(frame, node, x, y, s, stroke_for(s, width), stroke);
     if (across) turn(frame, node, rotation(900));
+    return s;
 }
 
-// One ring: centre (cx, cy), half width a, half height b, corner radius r, all Q10 pixels. Its pieces in order: the
-// quarter arcs top left, top right, bottom right and bottom left (drawn at radius 8, turned a quarter each), the two
-// pieces down the left side, the two down the right, then the top and the bottom.
+// Node marker n (4 a ring) in place of the box the OP-XY draws at (x, y), `length` along the ring's edge and `thick`
+// across it (Q10 pixels), or none: true if it takes the box's place.
 template <class F>
-void ring(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 width) {
+inline bool mark(F& frame, u32 n, u32 marker, i32 x, i32 y, i32 length, i32 thick) {
+    const i32 most = length > thick ? length : thick, least = length > thick ? thick : length;
+    if (marker == ORIGINAL || (most << 10) > MARKER_LONG * least) {
+        hide(frame, SQUARES + n);
+        hide(frame, CIRCLES + n);
+        return false;
+    }
+    const i32 size = (length + thick) >> 1;            // across, Q10 pixels
+    hide(frame, marker == CIRCLE ? SQUARES + n : CIRCLES + n);
+    // The artwork is 16 px across; a diamond (the square turned) is 1.25 x the size from point to point, of 16 x 2^1/2.
+    const i32 s = clamp(marker == DIAMOND ? (size * 57) >> 10 : size >> 4, SMALLEST, 2 * unit);
+    const u32 node = marker == CIRCLE ? CIRCLES + n : SQUARES + n;
+    place(frame, node, x, y, s, MARKER_FILL, fill_and_stroke);
+    if (marker == DIAMOND) turn(frame, node, rotation(450));
+    return true;
+}
+
+// Ring `index`: centre (cx, cy), half width a, half height b, corner radius r, all Q10 pixels. Its pieces in order:
+// the quarter arcs top left, top right, bottom right and bottom left (drawn at radius 8, turned a quarter each), the
+// two pieces down the left side, the two down the right, then the top and the bottom; then its node markers.
+template <class F>
+void ring(F& frame, u32 index, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 width, u32 marker) {
+    const u32 first = index * PIECES;
     const i32 s = r >> 3;                         // the arcs' scale
     const i32 ax = a - r, by = b - r;             // the corners' centres, from the ring's
     if (s < SMALLEST) {
@@ -159,13 +194,26 @@ void ring(F& frame, u32 first, i32 cx, i32 cy, i32 a, i32 b, i32 r, i32 width) {
         }
     }
     const i32 side = by;                          // half each side's straight length: two pieces cover it
+    i32 down = 0;
     for (u32 j = 0; j < 2; ++j) {
         const i32 x = j ? cx + a : cx - a;
-        straight(frame, first + 4 + 2 * j, x, cy - (side >> 1), side, false, width);
+        down = straight(frame, first + 4 + 2 * j, x, cy - (side >> 1), side, false, width);
         straight(frame, first + 5 + 2 * j, x, cy + (side >> 1), side, false, width);
     }
-    straight(frame, first + 8, cx, cy - b, 2 * ax, true, width);
+    const i32 over = straight(frame, first + 8, cx, cy - b, 2 * ax, true, width);
     straight(frame, first + 9, cx, cy + b, 2 * ax, true, width);
+    // The markers, over the OP-XY's boxes: across the top and bottom, and each side's two pieces together. A piece
+    // under one is drawn thin: in the stroke that shows `width` wide unscaled, as the OP-XY draws it.
+    const u32 n = index * 4, thin = stroke_for(unit, width);
+    const i32 along = 32 * over, sides = side + 64 * down;   // Q10 pixels
+    const i32 thick = WIDTHS[stroke_for(over, width)], side_thick = WIDTHS[stroke_for(down, width)];
+    if (mark(frame, n, marker, cx, cy - b, along, thick)) shade(frame, first + 8, thin, stroke);
+    if (mark(frame, n + 1, marker, cx, cy + b, along, thick)) shade(frame, first + 9, thin, stroke);
+    for (u32 j = 0; j < 2; ++j) {
+        if (!mark(frame, n + 2 + j, marker, j ? cx + a : cx - a, cy, sides, side_thick)) continue;
+        shade(frame, first + 4 + 2 * j, thin, stroke);
+        shade(frame, first + 5 + 2 * j, thin, stroke);
+    }
 }
 } // namespace
 
@@ -240,6 +288,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const i32 damp = exp2_q10((whole << 10) - fall - unit) >> (whole - 1);            // 4 x 24^-x per s, Q8
     const i32 pulse = lab_setting(input, PULSE_SET, PULSE);                                          // Q10
     const i32 strike_size = 2 * lab_setting(input, STRIKE_SIZE_SET, STRIKE_SIZE) - unit;             // octaves, Q10
+    const u32 marker = (MARKER + lab_bits(input, 122, 2)) & 3;
     if (still) {
         for (u32 k = 0; k < 6; ++k) state.ages[k] = SWING_DONE;
         state.drop_age = SWING_DONE;
@@ -410,8 +459,8 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
             const i32 tall = clamp(b, 2 * unit, TALLEST * unit - bob);
             const i32 r = clamp((((wide < tall ? wide : tall) >> 4) * (unit - ROUNDING)) >> 6, 0, 16 * unit);
             const i32 cx = side ? MIDDLE_X * unit + x + drawn[j] : MIDDLE_X * unit - x + drawn[j];
-            ring(frame, (2 * k + side) * PIECES, clamp(cx, wide + 2 * unit, 478 * unit - wide), MIDDLE_Y * unit + bobbed[j],
-                 wide, tall, r, width);
+            ring(frame, 2 * k + side, clamp(cx, wide + 2 * unit, 478 * unit - wide), MIDDLE_Y * unit + bobbed[j],
+                 wide, tall, r, width, marker);
         }
     }
 }

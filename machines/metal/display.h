@@ -3,9 +3,10 @@
 
 namespace metal {
 // Twelve rings (the six modes, mirrored about the middle), each drawn as its outline: ten pieces, four quarter arcs,
-// two straight pieces down each side, one across the top and one across the bottom. Palette: twelve white strokes of
-// different widths (a piece takes the width that undoes its scale). No paths or text.
-using Frame = opxy::draw::Frame<0, 0, 120, 0, 12>;
+// two straight pieces down each side, one across the top and one across the bottom; then four node markers a ring,
+// as squares (48) and as circles (48). Palette: twelve strokes of different widths (a piece takes the width that undoes
+// its scale), then the markers' fill. No paths or text.
+using Frame = opxy::draw::Frame<0, 0, 216, 0, 13>;
 struct DisplayState {
     opxy::u32 initialized, track, previous_event;
     opxy::i32 ages[6];       // Q10 seconds since each mode was struck

@@ -122,7 +122,104 @@
   <path id="metal_node_117" transform="matrix(1 0 0 1 640 320)" d="M0,-32 L0,32" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
   <path id="metal_node_118" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
   <path id="metal_node_119" transform="matrix(1 0 0 1 640 320)" d="M0,-16 L0,16" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="square"/>
-  <!-- The palette: twelve white strokes, 0.375 px x 1.405^i wide. -->
+  <!-- The node markers: four a ring, squares then circles. -->
+  <path id="metal_node_120" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_121" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_122" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_123" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_124" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_125" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_126" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_127" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_128" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_129" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_130" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_131" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_132" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_133" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_134" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_135" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_136" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_137" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_138" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_139" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_140" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_141" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_142" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_143" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_144" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_145" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_146" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_147" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_148" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_149" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_150" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_151" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_152" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_153" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_154" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_155" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_156" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_157" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_158" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_159" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_160" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_161" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_162" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_163" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_164" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_165" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_166" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <path id="metal_node_167" transform="matrix(1 0 0 1 640 320)" d="M-8,-8 L8,-8 L8,8 L-8,8 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_168" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_169" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_170" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_171" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_172" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_173" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_174" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_175" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_176" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_177" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_178" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_179" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_180" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_181" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_182" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_183" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_184" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_185" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_186" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_187" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_188" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_189" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_190" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_191" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_192" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_193" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_194" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_195" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_196" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_197" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_198" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_199" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_200" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_201" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_202" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_203" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_204" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_205" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_206" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_207" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_208" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_209" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_210" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_211" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_212" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_213" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_214" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <circle id="metal_node_215" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="miter"/>
+  <!-- The palette: twelve #FFFFFF strokes, 0.375 px x 1.405^i wide. -->
   <circle id="metal_palette_0" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#000000" stroke="#FFFFFF" stroke-width="0.3750"/>
   <circle id="metal_palette_1" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#000000" stroke="#FFFFFF" stroke-width="0.5269"/>
   <circle id="metal_palette_2" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#000000" stroke="#FFFFFF" stroke-width="0.7403"/>
@@ -135,4 +232,6 @@
   <circle id="metal_palette_9" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#000000" stroke="#FFFFFF" stroke-width="8.0005"/>
   <circle id="metal_palette_10" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#000000" stroke="#FFFFFF" stroke-width="11.2407"/>
   <circle id="metal_palette_11" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#000000" stroke="#FFFFFF" stroke-width="15.7932"/>
+  <!-- 12: the markers, filled, with a 1 px edge. -->
+  <circle id="metal_palette_12" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="1" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
 </g>
