@@ -14,10 +14,9 @@ The port kit keeps the prototype's name: its engine is `rings.c`.
 
 | Folder | What |
 | --- | --- |
-| [machines/metal](machines/metal) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, `presets/` (generated), and its sound test `tests/sound.cpp` |
+| [machines/metal](machines/metal) | The machine: `engine.cpp`, `fixmath.h`, `core.h`, `tables.h` (generated), `display.cpp`, artwork, `definition.json`, `machine.json`, its presets `presets/`, and its sound test `tests/sound.cpp` |
 | [port-kit](port-kit) | The port kit as handed over: the brief, the float reference engine, the 27 reference renders, `compare.py`, the prototype |
 | [tools/gen_tables.py](tools/gen_tables.py) | Generates `tables.h` and `display_tables.h` from the reference's constants and checks the filter designs |
-| [tools/gen_presets.py](tools/gen_presets.py) | Generates `presets/`, the presets the builder installs on the OP-XY, from `definition.json`'s presets and `machine.json`'s envelope |
 | [tools/gen_panel.py](tools/gen_panel.py) | Generates the screen's artwork, `panel.svg.fragment`: the pieces of the twelve rings and the stroke palette `display.cpp` uses |
 | [tools/screen_lab.py](tools/screen_lab.py) | The SDK's workbench with a screen lab panel (browser only): the OP-XY look, which draws strokes as the device does (a shrunk piece keeps its full stroke width); the node markers' shape and corners; the colour |
 | [tools/check_renders.py](tools/check_renders.py) | Renders every reference setting through the machine and runs `compare.py` |
@@ -40,12 +39,15 @@ per mode; the first is at 0.54 of the note (0.29 at STRETCH +100). Make-up is th
 harmonic lattice get up to 18 dB more (they catch less of it), modes stretched up up to 12 dB more. The modes stop at
 10.9 kHz, fading from 9.8 kHz.
 
-The presets: **Metal** (STRETCH 99), **Material** (50), **Squeezed** (25), **All modes** (MODES 99) and **Fall**
-(DROP 99), the rest as the defaults (DROP 0, RATIO 9, STRETCH 99, MODES 20). They ship with the machine (SDK 1.3):
+The presets were made and saved on the OP-XY: **default**, **dripping faucet**, **home run**, **latex gloves**,
+**out of love**, **robot blues**, **speaker knocker** and **waterwraith**. They ship with the machine (SDK 1.3):
 `machine.json` names the folder `presets`, and the SDK's browser builder installs each file there as
-`content/presets/metal/<name>.json` (`metal`, `material`, `squeezed`, `all-modes`, `fall`), beside the init preset
-it makes, `default.json` (the same as Metal). `sdk.py build` packages do not add them. `definition.json` holds the same
-five for the browser preview; `tools/gen_presets.py` writes the folder from it, so change them there and rerun it.
+`content/presets/metal/<name>.json`. `default.json` replaces the init preset the builder would make. `sdk.py build`
+packages do not add them. The files are the device's own `<name>.preset/patch.json`, renamed `<name>.json` with `-`
+for each space (the SDK allows only lowercase letters, digits, `-` and `_`). To change one, save it on the device and
+copy its `patch.json` over the file. `definition.json` holds the same knobs for the browser preview; keep the two
+together. The controls' own defaults stay as they were (DROP 0, RATIO 9, STRETCH 99, MODES 20): the screen's
+`KNOB_REST` follows them.
 
 ### Envelope: option B
 
@@ -54,11 +56,8 @@ section 2). The voice runs as the reference does at ATTACK 0 and SUSTAIN 1, stru
 the reference's fixed 3 ms eased onset, which stops the strike clicking. There are no envelope alternates, because a
 machine cannot drive the stock envelope.
 
-`machine.json` sets the factory amp envelope's attack to 0 and sustain to 0. The SDK does not document how its
-0..32767 envelope words map to seconds. For the reference's defaults (DECAY about 2 s, RELEASE about 1.1 s), set
-decay and release on the device, then copy the saved words into `presetDefaults.amp` and rerun
-`tools/gen_presets.py`. Until then the init preset and the five presets carry the builder's own decay (8192) and
-release (32767, the device's shortest).
+Each preset carries the envelope it was saved with, set by ear on the device, so `machine.json` sets no
+`presetDefaults` (they only shape the init preset the builder makes, which `default.json` replaces).
 
 What option B changes, measured by `tools/check_renders.py` (the stock envelope emulated as one gain on the output,
 against the kit's renders):

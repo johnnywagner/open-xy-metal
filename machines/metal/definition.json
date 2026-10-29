@@ -48,35 +48,53 @@
     }
   ],
   "presets": {
-    "Metal": {
-      "drop": 0,
-      "ratio": 0.089449,
-      "stretch": 1,
-      "modes": 0.2
+    "Default": {
+      "drop": 0.250008,
+      "ratio": 0.199988,
+      "stretch": 0.609973,
+      "modes": 0.709983
     },
-    "Material": {
-      "drop": 0,
-      "ratio": 0.089449,
-      "stretch": 0.5,
-      "modes": 0.2
-    },
-    "Squeezed": {
-      "drop": 0,
-      "ratio": 0.089449,
-      "stretch": 0.25,
-      "modes": 0.2
-    },
-    "All modes": {
-      "drop": 0,
-      "ratio": 0.089449,
-      "stretch": 1,
-      "modes": 1
-    },
-    "Fall": {
+    "Dripping faucet": {
       "drop": 1,
-      "ratio": 0.089449,
-      "stretch": 1,
-      "modes": 0.2
+      "ratio": 0,
+      "stretch": 0.359996,
+      "modes": 0.309977
+    },
+    "Home run": {
+      "drop": 0,
+      "ratio": 0.089999,
+      "stretch": 0,
+      "modes": 0.199988
+    },
+    "Latex gloves": {
+      "drop": 0.249947,
+      "ratio": 0.810022,
+      "stretch": 0.339976,
+      "modes": 0.169988
+    },
+    "Out of love": {
+      "drop": 0.779992,
+      "ratio": 0.119968,
+      "stretch": 0.259987,
+      "modes": 0.410016
+    },
+    "Robot blues": {
+      "drop": 0,
+      "ratio": 0.399457,
+      "stretch": 0.359966,
+      "modes": 0.950011
+    },
+    "Speaker knocker": {
+      "drop": 0,
+      "ratio": 0.039979,
+      "stretch": 0.610004,
+      "modes": 0
+    },
+    "Waterwraith": {
+      "drop": 1,
+      "ratio": 0.03,
+      "stretch": 0.250008,
+      "modes": 0
     }
   },
   "resources": {
