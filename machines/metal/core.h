@@ -16,7 +16,6 @@ struct Voice {
     u32 knobs_seen;          // knob[] holds the words the set-up was made for
     i32 knob[4];             // drop, ratio, stretch, modes as last applied
     i32 linc;                // log2 of setup_inc as a voice-rate increment, Q24
-    i32 trim;                // log2 of the output gain for the knobs' setting (trim.h), Q24, 0 or below
     i32 sp, lsp;             // the FM lattice spacing for RATIO (Q26) and its log2
     i32 ldm[MODES];          // log2 of each material ratio's distance to that lattice (Q26; NO_LOG for none), make-up
     // DROP
@@ -39,11 +38,14 @@ struct Voice {
     i32 fir[2];
     i32 chain[8];
     i32 hb[5];               // the half-band to the output rate: its last input and the allpasses' last outputs
+    // the limiter (engine.cpp, limit): the block it holds back, log2 of the gain that holds that block at LIM_T, and
+    // log2 of the gain the last block ended on (Q24; 0: unity)
+    i32 lim_buf[64];
+    i32 lim_lt, lim_lg;
     i32 ch_c[6];             // the chain's coefficients (engine.cpp, setup_chain)
-    // MODAL: undamped two-pole oscillators at the voice rate, damped every step
+    // MODAL: two-pole resonators at the voice rate
     i32 y1[MODES], y2[MODES];
-    i32 mc[MODES];           // below VR/7: 2 - 2 cos th, Q31; above: 2 cos th, Q30
-    i32 lch[MODES];          // log2 cos(th / 2), Q24
+    i32 mc[MODES];           // below VR/7: 2 - 2 r cos th, Q31; above: 2 r cos th, Q30
     i32 b[MODES];            // drive into each mode, Q31
     i32 sn[MODES];           // sin th, Q31
     i32 lim[MODES];          // hot's limit on (A sin th / 2)^2, Q31 (engine.cpp)
@@ -57,7 +59,6 @@ struct Voice {
     i32 lrr[MODES];          // log2 of the mode's ratio to the note (material, STRETCH, spread), Q24
     i32 mk[MODES], mk_target[MODES];   // make-up gain, Q25
     u32 high;                // bit k: mode k is above VR/7
-    u32 pair;                // bit k: mode k is below VR/4 (input once per two); otherwise every voice sample
     u32 gx_dirty;
     u32 easing;              // make-up has not reached its targets
 };

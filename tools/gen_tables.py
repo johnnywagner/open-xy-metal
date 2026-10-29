@@ -40,16 +40,16 @@ MODAL_TAB = [[1, 2, 3, 4, 5, 6, 7, 8],
 MODE_HASH = [0.31, -0.83, 0.62, -0.17, 0.94, -0.55, 0.08, -0.71]
 
 # ---- the machine's scaling (see engine.cpp) ----
-# Output gain: the brief's gain 143 put the loudest reference setting (ratio 1) at 0x10000000, but the machine then sat
-# 13 dB below 2op FM (the SDK's stock-loudness reference) in K-weighted loudness. LEVEL_DB lifts it 12 dB; the engine
-# clips at half scale, which only the loudest settings' first transient reaches.
+# Output gain: the brief's gain 143 (the loudest reference setting, ratio 1, at 0x10000000, 1/8 of full scale: 2op
+# FM's peak) and 12 dB more. Metal's peaks sit 8 to 14 dB above its K-weighted loudness, 2op FM's 4 (mostly the
+# waveform: six inharmonic modes stack into peaks; the strike adds about 1 dB), so at 143 it was 12 dB quieter than
+# 2op FM. At +12 dB the loudest notes would pass the SDK's half-scale ceiling; the limiter in render() (engine.cpp)
+# holds every voice at LIM_DB under it, turning down about 2% of notes, by 0.5 dB typically and 2.4 dB at most. After
+# it the output is doubled (6 dB more), to full scale: the OP-XY's stock engines peak near full scale per voice.
 LEVEL_DB = 12.0
+LIM_DB = -0.3          # the limiter's threshold against half scale
+LIM_RELEASE_DB = 10.0  # how fast its gain comes back, dB per second
 OUT_GAIN = 143.0 * 10 ** (LEVEL_DB / 20)
-# BOOST_DB more, in the band's gain. That is all the clean headroom there is: the first 50 ms (the strike, BITE and
-# the modes' early ring) peak 11 to 16 dB above the ring's loudness, at -14.7 to -6.2 dBFS without it (every knob
-# setting on a grid, C1 to C7). With 1 dB, 1.5% of those renders touch the half-scale ceiling, by at most 0.8 dB, for a
-# few samples. (A soft knee for 8 dB was tried and was gritty.)
-BOOST_DB = 1.0
 CORE_X = 1.0         # the FM core's output is the reference's x (its carrier at 1/16 full scale; x = car / 2)
 DRIVE_SCALE = 8.0    # into and through the resonator: 8x the reference's level
 LOGQ = 24            # log2 values are Q24
@@ -318,7 +318,7 @@ const('MODE_SHIFT', MODE_SHIFT, 'the mode states carry 2^this x their share of t
 const('LEVEL_DB', int(LEVEL_DB), 'the output level over the brief (dB)')
 const('LP_FIR', q(fir[1]), 'both fixed 20.7 kHz low-passes (Q 0.2) as one 3-tap linear-phase FIR at the voice rate, DC gain 1: x1 + h (x0 + x2 - 2 x1), h = 1/32 + 1/1024, Q31')
 table('HB_IIR', [q(x) for x in HB_IIR], comment='the half-band to the output rate: allpass coefficients, even ones path 0 (even outputs), odd ones path 1, Q31')
-const('L_OUT', log2q(OUT_G * 10 ** (BOOST_DB / 20)), 'log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB x BOOST_DB; folded into the EQ')
+const('L_OUT', log2q(OUT_G), 'log2 of the mix to the output: dry share x both stage gains x 143 x LEVEL_DB; folded into the EQ')
 const('HP_RATIO', q(HP_RATIO), 'keytracked high-pass at 0.45 x the note, Q31')
 const('L_CH_A1', log2q(CHAIN['a1']), 'the chain after the modes, analog prototype in s / (2 pi f0): high-pass, log2 a1')
 const('L_CH_A0', log2q(CHAIN['a0']), 'log2 a0')
@@ -326,11 +326,12 @@ const('L_CH_B2', log2q(CHAIN['b2']), 'band s (b2 s + b1) / (s^2 + c1 s + c0): lo
 const('L_CH_B1', log2q(CHAIN['b1']), 'log2 b1')
 const('L_CH_C1', log2q(CHAIN['c1']), 'log2 c1')
 const('L_CH_C0', log2q(CHAIN['c0']), 'log2 c0')
-const('HALF_SCALE', (1 << 30) - 1, 'the output ceiling: half scale, the SDK limit')
+const('HALF_SCALE', (1 << 30) - 1, 'the limiter\'s ceiling: half scale, the SDK limit (the output is doubled after it, to full scale)')
+const('LIM_T', int((1 << 30) * 10 ** (LIM_DB / 20)), 'the limiter holds each voice\'s peak at this (LIM_DB under half scale)')
+const('LIM_RELEASE', log2q(10 ** (LIM_RELEASE_DB * 64 / FS / 20)), 'log2 of how far the limiter\'s gain comes back per block (LIM_RELEASE_DB per second), Q24')
 const('SINE_CURVE', q((2 * math.pi / 2048) ** 2 / 2), "sine(): the table's curvature, (2 pi / 2048)^2 / 2, Q31")
 const('INC_LIMIT', int(MODE_TOP * 2 ** 32), 'the modes stop just below the voice rate\'s Nyquist (10.9 kHz), as a voice-rate phase increment')
 const('INC_SIXTH', int(2 ** 32 / 7), 'modes below VR/7 keep 2 - 2 r cos th as a Q31 coefficient')
-const('INC_QUARTER', int(2 ** 32 / 4), 'modes below VR/4 (5.5 kHz) take their input once per two voice samples; above, every sample')
 const('INC_DROP_LIMIT', int(0.225 * 2 ** 32), 'the drop keeps the carrier below 0.45 VR (9.9 kHz), as a 1x (output rate) increment')
 const('INC_20HZ', int(round(20 / VR * 2 ** 32)), '20 Hz as a voice-rate phase increment')
 const('L_INC_20HZ', log2q(20 / VR * 2 ** 32), 'its log2')
@@ -346,7 +347,9 @@ const('KK_MAKEUP', q(1 - math.exp(-64 / (FS * 0.02))), "make-up gain easing per 
 table('L_RM', [log2q(r) for r in rm], comment="log2 of each mode's material ratio, Q24")
 table('L_SPREAD', [q(x, LOGQ) for x in spread], comment="each mode's fixed detune, log2, Q24")
 table('L_BW', [log2q(b) for b in bw], comment="log2 of each mode's bandwidth in Hz")
-table('DAMP16', [q(p ** VSTEP) for p in pole], comment="each mode's decay over a step (8 voice samples, 16 output samples), r^8 (ring 3.6 s x rt), Q31")
+table('DAMP_R', [q(p) for p in pole], comment="each mode's pole radius r per voice sample (ring 3.6 s x rt), Q31")
+table('DAMP_2', [q(2 * (1 - p)) for p in pole], comment='2 - 2 r: with r (2 - 2 cos th), 2 - 2 r cos th, Q31')
+table('DAMP_Q', [q(1 - p * p) for p in pole], comment='1 - r^2: -r^2 y2 is -y2 + (1 - r^2) y2, Q31')
 table('L_B', lb, comment='log2 of (1 - r) 2 sqrt(r) ra RES_GAIN x wet / dry x 2^MODE_SHIFT: the input gain before sin th, sqrt(1 + eps), make-up, edge and MODES')
 table('L_EPS', leps, comment='log2 of (1 - r)^2 / (4 r): with sin(th)^2, the correction sqrt(1 + eps)')
 table('L_BP', lbp, comment='log2 of RES_GAIN 2 / (Wp fs) x wet x 2^MODE_SHIFT: STRIKE into each mode, before sin th and its share sqrt(ra) edge MODES / wsum')
@@ -391,7 +394,6 @@ const('RATIO_LO', q(99 / 100), 'RATIO per knob up to 98, Q31')
 const('RATIO_98', q(0.98), 'RATIO at 98, Q31')
 const('RATIO_HI', q(1.98, 29), 'RATIO per knob from 98 to 99, Q29')
 table('SINE', SINE, per=8, comment='sin, 2048 points per cycle and a guard point, Q30')
-table('SINE16', [max(-32767, min(32767, int(round(math.sin(2 * math.pi * i / 4096) * 32768)))) for i in range(4096)], ctype='opxy::i16', per=16, comment='sin, 4096 points per cycle, Q15: the FM core reads it without interpolation (phase spurs below -70 dBc)')
 table('LOG2T', LOG2T, comment='log2(1 + i/1024), Q30')
 table('EXP2T', EXP2T, ctype='u32', comment='2^(i/1024), Q30')
 table('SP2T', SP2T, comment='log2(1 + 2^-a), a = i/32, Q30')

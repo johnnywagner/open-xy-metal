@@ -14,7 +14,7 @@ effects). It is not the SDK.
   pull request to the SDK's `staging` branch, not part of the machine.
 - **This repository holds Metal** (`machines/metal`, ID `metal`; once called rings), a fixed-point port of the float reference in `port-kit/`
   with the reference's own mode tuning, its voice at half the output rate. Earlier versions are in the git history.
-  Read README.md and port-kit/BRIEF.md first. `tools/gen_tables.py` generates `tables.h` and `display_tables.h`, `tools/gen_trim.py` `trim.h` (rerun it after any change to the sound: it measures the engine), and `tools/gen_panel.py` the artwork;
+  Read README.md and port-kit/BRIEF.md first. `tools/gen_tables.py` generates `tables.h` and `display_tables.h`, and `tools/gen_panel.py` the artwork;
   edit the generator, not the headers. Check sound changes with `tests/sound.cpp` (run by `sdk.py test`) and
   `tools/check_renders.py`. The render path stays free of float, division and 64-bit arithmetic.
 - **Each machine keeps its own folder,** ID and `tests/`. Keep build and preview

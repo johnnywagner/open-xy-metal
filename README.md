@@ -34,7 +34,7 @@ The SDK lives beside this repository (`../open-xy`, branch `staging`), which bui
 | 4 | MODES: 1..6 modes, continuous (1 at 0, 6 at 99); the next mode fades in | 0..99 |
 
 Every readout is 0..99, as the OP-XY's own synths show theirs. Under them are the reference's mappings (DROP skewed and RATIO stepped as above), except that MODES runs over the reference's first six modes, not its eight
-(for CPU: each mode costs about 520 instructions per voice block). The modes sit at the material's ratios with the reference's small fixed detune
+(for CPU: each mode costs about 840 instructions per voice block). The modes sit at the material's ratios with the reference's small fixed detune
 per mode; the first is at 0.54 of the note (0.29 at STRETCH +100). Make-up is the reference's: modes off the FM's
 harmonic lattice get up to 18 dB more (they catch less of it), modes stretched up up to 12 dB more. The modes stop at
 10.9 kHz, fading from 9.8 kHz.
@@ -65,34 +65,75 @@ against the kit's renders):
 
 ## Level
 
-The band after the modes carries the output gain: 12 dB above the brief's level (which was 13 dB under 2op FM), plus
-`BOOST_DB` (1 dB). The output is clamped at the SDK's half-scale ceiling (-6 dBFS); there is no limiter.
+The band after the modes carries the output gain: the brief's gain 143, which puts the loudest reference setting
+(RATIO 1) at 1/8 of full scale (the peak 2op FM declares), and 12 dB more (`LEVEL_DB` in `tools/gen_tables.py`). There
+the loudest notes would pass the SDK's half-scale ceiling (-6 dBFS), so a **limiter** holds each voice 0.3 dB under it
+(`limit` in `engine.cpp`), by gain alone: nothing shapes the wave, and there is no per-setting trim. Then the output is
+**doubled**, to just under full scale (`outputPeakQ31` 2147483647): 18 dB over the brief in all.
 
-**The trim.** At many settings a strike's first milliseconds would pass that ceiling and be clipped (measured over every
-3rd step of each knob and every second note from C1 to C7: at 21% of them, by up to 5.7 dB; worst with DROP low,
-RATIO high, and few modes). `trim.h` (`tools/gen_trim.py`) holds, for each of those settings, how far to turn the voice
-down so that its loudest note stays 0.5 dB under the ceiling, each node covering its neighbours' needs too; the engine
-interpolates it over the four knobs whenever one moves and folds it into the band's gain, so it costs nothing per
-sample. About 70% of settings are turned down somewhat (by 1.4 dB at the median, 4.8 at most); over 800 random settings
-at every note from C1 to C7, none then reaches the ceiling (the loudest is 0.1 dB under it). The paragraph below
-predates it.
+**Why full scale.** A recording on the OP-XY (build 016, before the doubling: Metal struck four times, then the stock
+Wavetable, the same ADSR and track volume, no filter) put Metal 13.9 dB under Wavetable in K-weighted loudness: its
+peaks 9.9 dB lower (-29.3 against -19.4 dBFS in the recording, the first 250 ms of each note) and 4 dB more above its
+average (9.5 dB against 5.5). A typical Metal note then sat about 4 dB under half scale, so Wavetable's peak is about
+full scale per voice: the stock engines do not keep to the SDK's half scale. The doubling takes 6 dB of the gap; the
+rest is Metal's crest (the strike and the inharmonic modes) and the headroom its typical note leaves under the
+limiter. Whether the OP-XY's filter and mixer take Metal at full scale cleanly, at high resonance and with many
+voices, is for the device to show.
 
-That 1 dB is all the clean headroom there is. The loud part of a Metal note is its first 50 ms (the strike, BITE and
-the modes' early ring), which peaks 11 to 16 dB above the ring's loudness: over a grid of every knob setting from C1
-to C7, peaks run from -14.7 to -6.2 dBFS before the boost (median -9.5). With 1 dB, 1.5% of those renders touch the
-ceiling, by at most 0.8 dB, for a few samples; with 2 dB, 10%; with 3, 21%. Tried and dropped:
+**The limiter.** The voice sounds a block (1.45 ms) late, so the limiter knows each block's peak before the block
+sounds. A block ramps linearly from the last block's gain to the lowest of: what holds it under the threshold, what
+holds the next block under it, and the last gain brought back by 0.0145 dB (1 dB per 100 ms). Both ends of the ramp,
+and every sample between, are at or under what the block needs, so no sample passes the threshold, and the gain
+falls over at least a block. Where nothing passes the threshold the gain stays at 1, and the voice is the same sample
+for sample as without the limiter, a block late. Over 800 random settings at notes C1 to C7 every half octave, it
+turns down 2% of notes, by 0.5 dB typically and 2.4 dB at most. On the six notes it turns down most (by 1.5 to 2.2 dB),
+the floor between the partials rises 0 to 2.6 dB in the windows where it acts, and not at all elsewhere (the soft knee
+below: 7 to 15 dB). It costs 264 bytes a voice (`voiceBytes` 936 then, 908 now) and, counted from the compiled Blackfin code (not the simulator; the CPU
+table below is from before it), about 610 instructions a voice block, 950 while it turns a note down: three hardware
+loops (the block's peak, 4 instructions a sample; the held block out and the new one in, 5; or with the gain, 9) and
+its log2 and exp2. It runs in a function of its own: inlined into `render()` its loops lost their hardware loops (12
+instructions a sample). Every note
+starts 1.45 ms after its key.
 
-- **A soft knee** (8 dB into it, then 3): it bent the attack and the ring, adding 7 to 15 dB of energy between the
-  partials at 8 dB. Heard as grit.
-- **Phase rotation** (allpasses at fixed or keytracked frequencies, to lower the peaks without changing the spectrum):
-  from -1.7 to +2.7 dB, no gain on balance. The peaks are the attack's, not the waveform's shape.
-- **Less attack** (no BITE, or no STRIKE): 1 to 3 dB less peak for the loudness at some settings, none at others, and
-  it changes the strike.
+**Why this level.** Measured on the host against 2op FM (`open-xy-core-machines`, `machines/fm2op`), 800 random
+settings at notes C1 to C7 every half octave, and eight voices with each new note taking the one whose note started
+longest ago, the taken note fading over 23 ms (as with [etcetc000/open-xy#183](https://github.com/etcetc000/open-xy/pull/183)),
+random notes C1 to C7 10 to 60 ms apart, 24 settings:
 
-For more level, turn the track up on the OP-XY.
+| | Metal at 143 | +6 dB | +12 dB, limiter | Metal now (doubled) | 2op FM |
+| --- | --- | --- | --- | --- | --- |
+| One voice: peak, median / loudest | -22.4 / -16.1 dBFS | -16.4 / -10.1 | -10.4 / -6.3 | -4.3 / -0.3 | -18.1 / -18.1 |
+| One voice: K-weighted loudness (400 ms, loudest), median | -33.2 LUFS | -27.1 | -21.1 | -15.1 | -21.6 |
+| Eight voices, keys held: sum's peak, loudest setting | -7.4 dBFS | -1.4 | +4.6 | +10.6 | +0.5 |
+| Eight voices, a 2 s decay: sum's peak, loudest setting | -10.4 dBFS | -4.4 | +1.5 | +6.9 | -2.3 |
+
+A Metal note's peaks sit 8 to 14 dB above its loudness (2op FM's: 4). That is mostly the waveform, not the strike:
+six inharmonic modes stack into peaks, and the first 50 ms is only about 1 dB louder than the ring. At 143 Metal was
+12 dB quieter than 2op FM, at +6 dB still too quiet on the OP-XY, and at +12 dB as loud as 2op FM but still well
+under the stock engines (above). Eight voices played fast sum past full scale on the host, 10 dB more than 2op FM's. The machine once ran 13 dB over the brief with a table of
+trims over the four knobs (`trim.h`, 57,800 bytes) and clipping was heard on the front of the strikes when lots of keys
+were played in quick succession, but its recording (peak -0.1 dBFS) has no flattened tops and the same crest factor
+as one at 143: what was heard was most likely the taken voices' cut ([Voices](#voices)), since faded. Whether the
+OP-XY's mix takes eight such voices cleanly is for the device to show.
+
+Tried and dropped: **a soft knee** (8 dB into it, then 3: it bent the attack and the ring, adding 7 to 15 dB of energy
+between the partials, heard as grit), **phase rotation** (allpasses to lower the peaks without changing the
+spectrum: -1.7 to +2.7 dB, no gain on balance), **less attack** (without BITE and STRIKE the voice is a steady tone
+for the stock envelope to shape, but that gains only 1 to 2.5 dB and changes the strike, which the stock envelope
+cannot put back), and **+6 dB without a limiter** (the most that fits under the ceiling: still too quiet on the OP-XY).
+
+**Every strike from silence.** A voice that has sounded and gets a new note plays the old note's held block (the
+limiter's) fading out to zero (1.45 ms, linear), then starts from silence, as a voice taken from another note does.
+Before, the strike was added to the ring: at the old level, with DROP 0, RATIO 0, STRETCH 0, MODES 99 and the eight
+voices above, 19% of 2,000 strikes passed the ceiling (at most by 11 dB), and repeated strikes in step with a mode
+could build it up past full scale (Overflow, below). A restruck note starts 1.45 ms later and no longer carries the
+previous ring into it; a single strike is unchanged. `tests/sound.cpp` (restrike_check) plays the eight voices at four
+settings and fails on any sample at the ceiling; limiter_check renders every reference setting through the limiter
+and without it, and fails on a sample over the threshold or any change where nothing passes it.
 
 ## Overflow
 
+(Since a restruck voice now starts from silence (Level, above), strikes no longer build up; the guards stay.)
 A voice struck again while it rings adds each strike to the modes, and repeated strikes in step with a mode build it up
 past full scale. The 32-bit sums used to wrap there, which turns an over into a full-scale spike of the other sign: a
 pop. At the default knobs, the same voice struck every 131 ms (16ths at about 115 BPM) wrapped on 11 of 85 notes from
@@ -106,11 +147,12 @@ sample wherever nothing wrapped before:
 - **The modes.** A mode at 0.8 of full scale or more (from its state, once a block and after a strike joins) runs the
   block with each output saturated where it would wrap. A mode grows by under 3% of full scale a step and one note
   alone stays below 0.75, so a mode below 0.8 cannot reach full scale before the next look.
-- **The band** after the modes saturates where its output would leave the 32-bit range (twice the ceiling): it is worked
+- **The band** after the modes saturates where its output would leave the 32-bit range (full scale): it is worked
   out as a quarter of itself and the rest, and the quarter cannot wrap until four times the range.
 - **The FIR** finds its second difference by parts where it would wrap (a full-scale mix at the top of the band), and
-  **the half-band's** doubling to the output saturates where it would wrap: its allpasses can overshoot half scale, to
-  1.43 times it.
+  **the half-band** runs on a quarter of the band's output, and its quadrupling back saturates at full scale where it
+  would wrap: its allpasses can overshoot their input's range, to 1.43 times it. The limiter then holds the voice
+  under half scale, and the doubling after it to full scale is exact.
 - **The chain** stops following the note at 6.78 kHz. Above that, a sum in its set-up left the 32-bit range (which gave
   the host and the OP-XY different coefficients), and from about 7.8 kHz its band was unstable.
 
@@ -131,10 +173,10 @@ python tools/gen_tables.py             # after changing a constant
 
 - The test compiles the reference into itself twice: as it is, and in double precision with the machine's own
   algorithm (the voice at half rate, the core with op2 stepping four reference samples, the fitted chain, the modes fed
-  in pairs or every sample, the strike's rotation, the half-band) built on the reference's state and
+  and damped every sample, the strike's rotation, the half-band) built on the reference's state and
   set-up.
 - It renders all 27 reference settings through the port and through the double-precision model, and compares the
-  FM core, the resonator's drive, the mix after the modes and the output: every stage of every setting at 56 to 68 dB
+  FM core, the resonator's drive, the mix after the modes and the output: every stage of every setting at 62 to 79 dB
   SNR (limit 55).
 - Against the engine before it ran at half rate: every spectral peak within 50 dB of the loudest matches to 0.3 dB up
   to C6 at the default settings, and to 1 to 3 dB at the extremes (C7, RATIO 1, the top modes near 10 kHz). What
@@ -157,17 +199,18 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
 - **FM core.** The reference runs its core at 2x with a half-band decimator. Here op2 and its one-poles step four
   reference samples per voice sample (op2's difference quartered, the one-poles at their coefficient for four, the
   feedback extrapolated to where the 2x core would read it), and the carrier steps two output samples, its increment
-  gliding per output sample. Sines come from a 4096-point table without interpolation.
+  gliding per output sample. Sines are interpolated from the 2048-point Q30 table the set-up uses (within 1.2e-6;
+  [Fidelity](#fidelity)).
 - **The chain, fitted.** The reference's two keytracked high-passes, presence peak and high shelf (sixth order) are two
   biquads here, fitted in units of the note (`tools/gen_tables.py`, CHAIN): within 1.4 dB from 0.2 times the note, 0.9 dB
   from half the note. A resonant high-pass shapes the drive (where the reference's first high-pass and presence peak
   are), and a band follows the modes. Both are made per note by the bilinear transform warped at the note, at the
   voice rate, stored near their poles.
-- **Modes** are the reference's two-pole resonators, run undamped, with their decay (`r^8`) applied every 8 voice
-  samples. Below VR/4 (5.5 kHz) they take the drive once per two samples as the pair's sum (gain corrected by
-  `1/cos(th/2)`), above it every sample. Each mode runs through the whole block in its own loop: with the Blackfin's
-  eight data registers, two modes per loop spilled more than sharing the input saved. Low modes keep
-  `2 - 2 cos th` as their coefficient, so a mode at 20 Hz holds its tuning to about 0.05 cents.
+- **Modes** are the reference's two-pole resonators, fed the drive and damped every voice sample
+  ([Fidelity](#fidelity)). Each mode runs through the whole block in its own loop: with the Blackfin's eight data
+  registers, two modes per loop spilled more than sharing the input saved. Low modes keep `2 - 2 r cos th` as their
+  coefficient (`r (2 - 2 cos th) + 2 - 2 r`), so a mode at 20 Hz holds its tuning to about 0.05 cents; `-r^2 y2` is
+  `-y2 + (1 - r^2) y2`.
 - **STRIKE** rings through its own copy of each mode for the note's first 8 voice samples, then joins the mode rotated
   by the filters it skips in the reference (magnitude and phase).
 - **Both fixed low-passes** (20.7 kHz, Q 0.2) are one 3-tap linear-phase FIR of shifts at the voice rate, within
@@ -177,6 +220,41 @@ The engine is the reference's signal path, simplified for the OP-XY's CPU.
 - **Transcendentals and divisions** happen only in set-up, made of table sine, log2 and exp2 (`fixmath.h`). The sine
   table's interpolation puts its curvature back, which keeps modes driven on their own frequency tuned to a few parts
   in 10^9.
+
+### Fidelity
+
+Three shortcuts once taken for CPU made every note sound a little lo-fi on the OP-XY: a buzz, and a shimmer at the
+top. Each is gone; measured on the host against the float reference (`tools/check_renders.py`'s renders, third-octave
+bands in the ring), the port now sits at or under the reference's floor in every band to 11 kHz, 125 to 137 dB down.
+
+**The FM sine.** The FM core once read its sines from a 4096-point Q15 table without interpolation. The phase error that leaves made a
+flat floor about 75 dB down in every third-octave from 1 kHz to 11 kHz, on every note, C2 included, where the float
+reference is 100 to 140 dB down: heard as a lo-fi buzz. (The double-precision model in `tests/sound.cpp` read the
+same table, so its stage check did not see it.) Interpolated from the 2048-point Q30 table, the floor in the ring is
+125 to 137 dB down, at or under the reference's; the Q15 table was removed (8 KB). It costs about 420 instructions a
+voice block (op2 26 to 32 a sample, the carrier 13 to 20; counted from the compiled code).
+
+**The modes' feed** (the shimmer). Modes below VR/4 (5.5 kHz) took the drive once per two voice samples, as the pair's
+sum. A mode's output carries its input directly, so that input, zero on every other sample, put an image of the note
+mirrored about 11,025 Hz into the output: a pair of tones at 11,025 Hz +- the loudest partial, which move with the
+note. The upper modes get the most make-up, so it grew with MODES: about 88 dB down at the defaults, 55 dB at MODES 99,
+as a recording from the OP-XY (build 020) showed. Fed every sample, as the reference does, the pair is 147 dB down.
+
+**The modes' decay.** The modes ran undamped, their decay (`r^8`) applied once per 8-sample step: a step in level every
+step, which put tones 2,756 Hz either side of each mode (and at twice and three times that), about 83 dB under the
+peak (67 dB in that recording). Damped every sample, they are 134 dB down.
+
+The two cost about 320 instructions a mode per voice block: the mode loop runs about 23 instructions a sample
+against about 13 a sample before (counted from the compiled code; unrolled by two, or a function of its own, it was no
+better), and the drive's high-pass, with no pair sums to form, about 110 fewer. In all about 8,900 a voice block at
+the defaults and 12,200 at MODES 6, against 8,400 and 10,400 with the shortcuts (the table below is from before the
+three). The voice is 28 bytes smaller (`voiceBytes` 908).
+
+**The half rate is not the cause** of any of it: the reference has almost nothing above 5 kHz at most settings
+(120 dB down above 11 kHz at the defaults, 100 dB at C6 with RATIO 1). A full-rate voice would need the same two fixes
+and cost about 13,000 a block at the defaults and 18,300 at MODES 6, over the budget, for what is left: the half-band's
+images near 19 to 22 kHz on high notes, 68 to 90 dB down before these changes, and now about 167 dB down at the
+settings measured.
 
 ## CPU
 
@@ -219,8 +297,8 @@ figures in the table; the differences are what to compare. What it did:
 
 - The low-pass FIR and the half-band each run in a function of their own: the compiler then gives the rest of the
   voice's code better registers, and the FIR becomes a hardware loop.
-- The band's range check compares `e >> 2` with q, and the ceiling saturates from `|u| >= 2^29` (the half-band's
-  bound, at `ceiling2`), each in fewer instructions and registers.
+- The band's range check compares `e >> 2` with q, and the output saturates from `|u| >= 2^29` (the half-band's
+  bound; now `full4`, at full scale), each in fewer instructions and registers.
 - Make-up's easing loop stops running once every mode has reached its target (`Voice::easing`).
 
 Most of that saving is register allocation in one large function, so later changes to `process()` can move it either
@@ -234,10 +312,22 @@ unpredictable branch, so it is mostly a count of multiplies. No device measureme
 
 ## Voices
 
-`voiceCapacity` is 8, as in the prototype. The SDK gives a new note a free voice, or else takes the voice whose note
-started longest ago. The prototype preferred released voices over held ones, which avoided clicks when a ringing voice
-was retaken. The SDK's rule cannot express that preference, so a taken voice stops where it is. Whether that clicks
-audibly needs a listen on the device with more than eight notes ringing.
+`voiceCapacity` is 8, as in the prototype. The OP-XY gives every note its own voice index; with more notes ringing
+than voices, the SDK takes the voice whose note started longest ago. In the SDK as released, that voice stops where
+it is (the old note's index renders silence from the next sample), and with lots of keys played in quick succession
+the cut clicks on the front of the new strike: on the host, 290 steps a minute at DROP 0, RATIO 0, STRETCH 0,
+MODES 99; on the device, steps at the strikes that took a voice. A Metal voice rings at full level until the stock amp
+envelope ends it, so the cut is loud; a pluck (Karplus, also 8 voices) is nearly silent by then. A machine cannot fade
+a taken voice itself: its old index goes silent, and a tail rendered through the new note's index would get the new
+note's envelope.
+
+The fix belongs in the SDK's voice adapter: [etcetc000/open-xy#183](https://github.com/etcetc000/open-xy/pull/183)
+starts the new note at once in one of four spare voices and fades the old note over 23 ms (a raised cosine): Metal's
+lowest mode is at 0.54 of the note (35 Hz at C2), and a one-block fade (1.45 ms) of it still clicked on the device
+(on the host, 11 to 36 dB of the cut's 23 to 44 dB of click left at C1 to C4; 23 ms leaves about none). Until it is
+merged, a build from the released SDK clicks where a voice is taken. Tried on the device:
+16 voices made the clicks rare and 256 (as 2op FM has) removed them, but a machine should not need a voice per stock
+index to sound clean.
 
 ## Licensing
 

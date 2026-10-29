@@ -2,8 +2,8 @@
 //
 // The reference engine (port-kit/engine/rings.c) is compiled into this test twice: as it is (float, the spec), and in
 // double precision, where the machine's own algorithm is built on the reference's state and set-up (dbl::block_v: the
-// voice at half the output rate, the FM core with op2 stepping four reference samples, the modes run undamped and fed
-// in pairs or every sample, the half-band to the output rate). Every render in
+// voice at half the output rate, the FM core with op2 stepping four reference samples, the modes fed and damped every
+// voice sample, the half-band to the output rate). Every render in
 // port-kit/reference/manifest.json goes through the Q31 port and that model, as the machine runs it (ATTACK 0,
 // SUSTAIN 1: on the device the stock amp envelope shapes the sound), and they are compared sample by sample at four
 // stages: the FM core, the resonator's drive, the mix after the modes, and the output. That checks the fixed point.
@@ -58,8 +58,8 @@ static const int STEPV = RINGS_BLOCK / 2;
 // the carrier stepping two output samples per voice sample. The same, in double precision, on the reference's own
 // state and helpers.
 static float s2pp_state;                             // op2 two steps back (reset per render)
-// The engine's FM sine: the 4096-point Q15 table, read without interpolation.
-static float sin16d(uint32_t ph) { return metal::SINE16[ph >> 20] / 32768.0; }
+// The engine's FM sine (fm_sine): interpolated from the 2048-point table, within 1.2e-6 of sin.
+static float sin_fm(uint32_t ph) { return sin(ph * (6.283185307179586 / 4294967296.0)); }
 static void core_block_v(rings_t* v, float* x)
 {
     double incd = note_hz(v->note) / v->fs;
@@ -83,11 +83,11 @@ static void core_block_v(rings_t* v, float* x)
     for (int k = 0; k < STEPV; ++k) {
         ph2 += 2u * inc2;
         const float fbx = s2p + 0.75f * (s2p - s2pp);
-        const float s2 = sin16d(ph2 + cyc2u(fb * fbx));
+        const float s2 = sin_fm(ph2 + cyc2u(fb * fbx));
         const float d = clip1(0.25f * (s2 - s2p)); s2pp = s2p; s2p = s2;
         const float m = l1; l1 = l1 / 16.f + 15.f / 16.f * d;
         const float u = l2; l2 = l2 / 16.f + 15.f / 16.f * clip1(depth * m);
-        x[k] = 0.0625f * sin16d(ph0);
+        x[k] = 0.0625f * sin_fm(ph0);
         for (int i = 0; i < 2; ++i) {
             inc += (uint32_t)dinc;
             ph0 += inc + 2u * cyc2u(0.25f * u);
@@ -118,9 +118,8 @@ static void strike_g(float r, float* gr, float* gi)
     const C g = hp * eq / (pk * band);
     *gr = g.real(); *gi = g.imag();
 }
-// The machine's MODAL (engine.cpp) at the voice rate: the reference's modes, set up as it sets them up, run undamped
-// with their decay applied every step; below VR/4 fed the pair sum x[n] + x[n+1] every other sample (b / cos(th/2)),
-// above every sample; struck with the pulse (the engine's STRIKE table, back in the reference's units) in a separate
+// The machine's MODAL (engine.cpp) at the voice rate: the reference's modes, set up as it sets them up, two-pole
+// resonators fed and damped every voice sample; struck with the pulse (the engine's STRIKE table, back in the reference's units) in a separate
 // ring that joins each mode rotated by G. Writes the mix, core + modes.
 static void modal_block_v(rings_t* v, float* x)
 {
@@ -176,37 +175,27 @@ static void modal_block_v(rings_t* v, float* x)
         if (wk[k] <= 0.f && v->ry1[k] == 0.f && v->ry2[k] == 0.f) continue;
         const float Tk = T * v->rt[k];
         const float r = expf(-6.9078f / (Tk * VR)), th = 6.2831853f * f / VR;
-        const float c1 = 2.f * cosf(th);
+        const float c1 = 2.f * r * cosf(th), r2 = r * r;
         const float M = sqrtf(1.f - 2.f * r * cosf(2.f * th) + r * r);
-        const bool paired = th < 0.5 * 3.14159265358979323846;
-        const float b = (1.f - r) * M * v->ra[k] * RES_GAIN * edge * mkg[k] * wk[k] / (paired ? cosf(0.5f * th) : 1.f)
+        const float b = (1.f - r) * M * v->ra[k] * RES_GAIN * edge * mkg[k] * wk[k]
                         * (float)(metal::RES_TRIM / 536870912.0);    // the modes' drive trim (Q29)
         const float bi = strike ? sinf(th) * sqrtf(v->ra[k]) * RES_GAIN * edge * wk[k] * 2.f / (Wp * VR * wsum) : 0.f;
         float s1 = 0.f, s2 = 0.f;
         if (strike)
             for (int n = 0; n < STEPV; ++n) {
-                const float a = c1 * s1 - s2 + bi * pl[n];
+                const float a = c1 * s1 - r2 * s2 + bi * pl[n];
                 y[n] += a; s2 = s1; s1 = a;
             }
         float y1 = v->ry1[k], y2 = v->ry2[k];
-        if (paired) {
-            for (int n = 0; n < STEPV; n += 2) {
-                const float a = c1 * y1 - y2 + b * (x[n] + x[n + 1]);
-                const float z = c1 * a - y1;
-                y[n] += a; y[n + 1] += z; y2 = a; y1 = z;
-            }
-        } else {
-            for (int n = 0; n < STEPV; ++n) {
-                const float a = c1 * y1 - y2 + b * x[n];
-                y[n] += a; y2 = y1; y1 = a;
-            }
+        for (int n = 0; n < STEPV; ++n) {
+            const float a = c1 * y1 - r2 * y2 + b * x[n];
+            y[n] += a; y2 = y1; y1 = a;
         }
-        const float d = powf(r, (float)STEPV);
-        v->ry1[k] = y1 * d; v->ry2[k] = y2 * d;
+        v->ry1[k] = y1; v->ry2[k] = y2;
         if (strike) {
             float gr, gi; strike_g(f / f0n, &gr, &gi);
             const float c = cosf(th), sn = sinf(th);
-            const float t1 = s1 * d, t0 = s2 * d, im = (t0 - c * t1) / sn;
+            const float t1 = s1, t0 = s2, im = (t0 - c * t1) / sn;
             const float r1 = gr * t1 - gi * im, r0 = c * r1 + gr * (t0 - c * t1) + gi * sn * t1;
             v->ry1[k] += r1; v->ry2[k] += r0;
         }
@@ -215,7 +204,6 @@ static void modal_block_v(rings_t* v, float* x)
 }
 // The half-band to the output rate (engine.cpp): two paths of first-order allpasses on half the voice's output.
 static double hb_state[5];
-static double model_trim = 1;                // the voice's output trim (trim.h), set by run()
 // The machine's whole block (engine.cpp) on the reference's state, in double precision, with its stages in the
 // port's units: core, drive and mix at the voice rate (at its index atv), the output at the output rate (ato). fir holds
 // the low-pass FIR's last two inputs.
@@ -249,7 +237,7 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
     for (int n = 0; n < STEPV; ++n) x[n] = bq_run(&st1, x[n]);
     modal_block_v(v, x);
     for (int n = 0; n < STEPV; ++n) tap[2][atv + n] = x[n] / ((1.f - WET) * gs);
-    const float gsx = DIST_PAD * G_FX * v->outgain * (float)model_trim;   // and the voice's trim
+    const float gsx = DIST_PAD * G_FX * v->outgain;
     double c[4];
     for (int i = 0; i < 4; ++i) c[i] = metal::HB_IIR[i] / 2147483648.0;
     double* q = hb_state;
@@ -259,12 +247,12 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
         const float lp = fir[1] + h * (fir[0] + in - 2.f * fir[1]);
         fir[0] = fir[1]; fir[1] = in;
         double o = bq_run(&st2, lp * g);             // the onset's second gain before the band
-        o = (o > 0.5 ? 0.5 : (o < -0.5 ? -0.5 : o)) / 2;
+        o = (o > 1.0 ? 1.0 : (o < -1.0 ? -1.0 : o)) / 4;
         const double t0 = c[0] * (o - q[1]) + q[0], u0 = c[2] * (t0 - q[2]) + q[1];
         const double t1 = c[1] * (o - q[3]) + q[0], u1 = c[3] * (t1 - q[4]) + q[3];
         q[0] = o; q[1] = t0; q[2] = u0; q[3] = t1; q[4] = u1;
-        tap[3][ato + 2 * n] = std::max(-0.5, std::min(0.5, 2 * u0));   // the ceiling
-        tap[3][ato + 2 * n + 1] = std::max(-0.5, std::min(0.5, 2 * u1));
+        tap[3][ato + 2 * n] = std::max(-1.0, std::min(1.0, 4 * u0));   // saturated at full scale
+        tap[3][ato + 2 * n + 1] = std::max(-1.0, std::min(1.0, 4 * u1));
     }
 }
 #undef float
@@ -290,8 +278,8 @@ static void block_v(rings_t* v, float* fir, double* tap[4], int atv, int ato)
 
 namespace {
 
-const double GAIN = 143.0 * 3.9810717055349722 * 1.1220184543019633;   // the machine's gain against the reference page's: 143, +12 dB, +1 dB (BOOST_DB)
-const opxy::i32 DECLARED_PEAK = 1073741823;  // definition.json outputPeakQ31 (half scale; the engine clips there)
+const double GAIN = 143.0 * std::pow(10.0, metal::LEVEL_DB / 20.0);   // the machine's gain against the reference page's: 143 and LEVEL_DB
+const opxy::i32 DECLARED_PEAK = 2147483647;  // definition.json outputPeakQ31 (full scale: the limiter's half scale, doubled)
 
 struct Setting { const char* name; int note; double drop, ratio, stretch, modes; };
 // port-kit/reference/manifest.json. The envelope renders (attack, decay, sustain) are the defaults here: the stock
@@ -412,12 +400,9 @@ Result run(const Setting& s, double* port[T_COUNT], double* exact[T_COUNT], doub
             if (a > r.peak) r.peak = a;
         }
     }
-    dbl::model_trim = std::exp2(voice.trim / 16777216.0);   // the voice's trim (trim.h): the model turns down as much
     model_run(s, exact);
     static float buffer[N];
     spec_run(s, spec[T_OUT], buffer);
-    // The float reference has no trim: compare against it turned down as much.
-    for (int n = 0; n < N; ++n) spec[T_OUT][n] *= dbl::model_trim;
     for (int k = 0; k < T_COUNT; ++k) r.snr[k] = snr(port[k], exact[k], 0, k == T_OUT ? N : N / 2);
     r.snr_float = snr(port[T_OUT], spec[T_OUT], 0);
     return r;
@@ -459,6 +444,86 @@ bool bend_check() {
     if (!ok) std::puts("FAIL bend: above the declared peak");
     return ok && sounding;
 }
+
+// Lots of keys in quick succession: eight voices, each new note going to the one whose note started longest ago, which
+// keeps its state (the OP-XY's stock voice reused while it still rings). Random notes C2..C6, 10 to 460 ms apart. No
+// sample may reach the ceiling: the limiter holds every voice at LIM_T, under it.
+bool restrike_check() {
+    static metal::Voice voices[8];
+    static metal::Shared shared;
+    const double knobs[][4] = {{0, 0, 0, 1}, {0, 1, 0, 0}, {0.25, 0.09, 0.5, 0.14}, {1, 0.5, 1, 1}};
+    bool ok = true;
+    for (unsigned s = 0; s < sizeof knobs / sizeof knobs[0]; ++s) {
+        const opxy::i32 parameters[8] = {word(knobs[s][0]), word(knobs[s][1]), word(knobs[s][2]), word(knobs[s][3])};
+        opxy::u32 inc[8], started[8], pitch[64], seed = 1, notes = 0;
+        opxy::i32 out[64];
+        for (int i = 0; i < 8; ++i) { metal::initialize(voices[i], shared, 1); started[i] = 0; inc[i] = 0; }
+        long next = 0, clipped = 0, strikes = 0;
+        for (long b = 0; strikes < 600; ++b) {
+            if (b == next) {
+                int v = 0;
+                for (int i = 1; i < 8; ++i) if (started[i] < started[v]) v = i;
+                seed = seed * 1103515245u + 12345u;
+                inc[v] = static_cast<opxy::u32>(note_hz_ref(36 + static_cast<int>((seed >> 16) % 49)) / 44100.0 * 4294967296.0);
+                started[v] = ++notes;
+                metal::start(voices[v], shared, 1);
+                ++strikes;
+                seed = seed * 1103515245u + 12345u;
+                next = b + 7 + static_cast<long>((seed >> 16) % 310);   // 10 .. 460 ms in blocks
+            }
+            for (int v = 0; v < 8; ++v) {
+                if (!inc[v]) continue;
+                for (int i = 0; i < 64; ++i) pitch[i] = inc[v];
+                metal::render(voices[v], shared, 1, out, parameters, pitch);
+                for (int i = 0; i < 64; ++i) clipped += out[i] == 2 * metal::HALF_SCALE || out[i] == -2 * metal::HALF_SCALE;
+            }
+        }
+        if (clipped) {
+            std::printf("FAIL restrike: knobs %.2f %.2f %.2f %.2f, %ld samples at the ceiling\n", knobs[s][0],
+                        knobs[s][1], knobs[s][2], knobs[s][3], clipped);
+            ok = false;
+        }
+    }
+    return ok;
+}
+}
+
+// The limiter (engine.cpp, limit): every reference setting through render() and through process(). render() is
+// process() a block late and doubled, the same sample for sample wherever process() stays under LIM_T, and never
+// above twice LIM_T (to within log2's and exp2's rounding) where it does not.
+bool limiter_check() {
+    static metal::Voice a, b;
+    static metal::Shared shared;
+    bool ok = true;
+    for (unsigned i = 0; i < sizeof SETTINGS / sizeof SETTINGS[0]; ++i) {
+        const Setting& s = SETTINGS[i];
+        const opxy::i32 parameters[8] = {word(drop_knob(s.drop)), word(ratio_knob(s.ratio)), word(s.stretch), word(s.modes), 0, 0, 0, 0};
+        opxy::u32 pitch[64];
+        for (int n = 0; n < 64; ++n) pitch[n] = pitch_for(s.note);
+        metal::initialize(a, shared, 1); metal::start(a, shared, 1);
+        metal::initialize(b, shared, 1); metal::start(b, shared, 1);
+        opxy::i32 held[64] = {0}, raw[64], out[64], peak = 0, raw_peak = 0;
+        long differ = 0;
+        for (int k = 0; k < BLOCKS; ++k) {
+            metal::process(a, raw, parameters, pitch, static_cast<metal::Taps*>(0));
+            metal::render(b, shared, 1, out, parameters, pitch);
+            for (int n = 0; n < 64; ++n) {
+                differ += out[n] != 2 * held[n];
+                peak = std::max(peak, out[n] < 0 ? -out[n] : out[n]);
+                raw_peak = std::max(raw_peak, raw[n] < 0 ? -raw[n] : raw[n]);
+                held[n] = raw[n];
+            }
+        }
+        const bool under = raw_peak <= metal::LIM_T;
+        if (peak > 2 * (metal::LIM_T + (metal::LIM_T >> 14)) || (under && differ)) {   // log2 and exp2 round: 0.0005 dB
+            std::printf("FAIL limiter: %s peak %.4f, %d over LIM_T (before the limiter %.4f), %ld samples differ\n", s.name,
+                        peak / 2147483648.0, peak - 2 * metal::LIM_T, raw_peak / 2147483648.0, differ);
+            ok = false;
+        } else if (!under)
+            std::printf("limiter: %s from %.4f to %.4f of full scale (%d over LIM_T)\n", s.name, raw_peak / 2147483648.0,
+                        peak / 2147483648.0, peak - 2 * metal::LIM_T);
+    }
+    return ok;
 }
 
 int main(int argc, char** argv) {
@@ -497,9 +562,11 @@ int main(int argc, char** argv) {
             ok = wav(path, fref, N, true) && ok;
         }
     }
-    std::printf("loudest peak %.4f of full scale (declared %.4f)\n", peak / 2147483648.0, DECLARED_PEAK / 2147483648.0);
-    if (peak > DECLARED_PEAK) { std::puts("FAIL above the declared peak"); ok = false; }
+    // before the limiter: render() holds it under the declared peak (limiter_check)
+    std::printf("loudest peak %.4f of full scale before the limiter (declared %.4f)\n", peak / 2147483648.0, DECLARED_PEAK / 2147483648.0);
     ok = bend_check() && ok;
+    ok = restrike_check() && ok;
+    ok = limiter_check() && ok;
     std::puts(ok ? "PASS" : "FAIL");
     return ok ? 0 : 1;
 }
