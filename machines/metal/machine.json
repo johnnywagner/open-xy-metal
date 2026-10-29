@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "sdk": "1.1",
+  "sdk": "1.3",
   "kind": "synth",
   "description": "A two-operator FM strike that drops onto each note, ringing six modes at a material's inharmonic ratios.",
   "identity": {
@@ -12,5 +12,6 @@
       "attack": 0,
       "sustain": 0
     }
-  }
+  },
+  "presets": "presets"
 }
