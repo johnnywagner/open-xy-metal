@@ -48,7 +48,8 @@ struct Voice {
     i32 mc[MODES];           // below VR/7: 2 - 2 r cos th, Q31; above: 2 r cos th, Q30
     i32 b[MODES];            // drive into each mode, Q31
     i32 sn[MODES];           // sin th, Q31
-    i32 lim[MODES];          // hot's limit on (A sin th / 2)^2, Q31 (engine.cpp)
+    i32 isn2[MODES];         // 2^-16 / sin^2 th, Q31: a mode's amplitude from its state (engine.cpp, level)
+    i32 gb[MODES];           // (16 b)^2 2^-16 / sin^2 th, Q31: its most growth in a block, per drive peak (calm)
     i32 edge[MODES];         // fade near 20 Hz and the top, Q31
     i32 wk[MODES];           // MODES' feed per mode, Q31
     i32 leps[MODES];         // log2 sqrt(1 + eps), Q24

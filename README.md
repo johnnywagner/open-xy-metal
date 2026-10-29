@@ -83,12 +83,13 @@ voices, is for the device to show.
 **The limiter.** The voice sounds a block (1.45 ms) late, so the limiter knows each block's peak before the block
 sounds. A block ramps linearly from the last block's gain to the lowest of: what holds it under the threshold, what
 holds the next block under it, and the last gain brought back by 0.0145 dB (1 dB per 100 ms). Both ends of the ramp,
-and every sample between, are at or under what the block needs, so no sample passes the threshold, and the gain
+and every sample between, are at or under what the block needs, so no sample passes the threshold (but for log2's
+and exp2's rounding, under 0.00001 dB), and the gain
 falls over at least a block. Where nothing passes the threshold the gain stays at 1, and the voice is the same sample
 for sample as without the limiter, a block late. Over 800 random settings at notes C1 to C7 every half octave, it
 turns down 2% of notes, by 0.5 dB typically and 2.4 dB at most. On the six notes it turns down most (by 1.5 to 2.2 dB),
 the floor between the partials rises 0 to 2.6 dB in the windows where it acts, and not at all elsewhere (the soft knee
-below: 7 to 15 dB). It costs 264 bytes a voice (`voiceBytes` 936 then, 908 now) and, counted from the compiled Blackfin code (not the simulator; the CPU
+below: 7 to 15 dB). It costs 264 bytes a voice (`voiceBytes` 936 then) and, counted from the compiled Blackfin code (not the simulator; the CPU
 table below is from before it), about 610 instructions a voice block, 950 while it turns a note down: three hardware
 loops (the block's peak, 4 instructions a sample; the held block out and the new one in, 5; or with the gain, 9) and
 its log2 and exp2. It runs in a function of its own: inlined into `render()` its loops lost their hardware loops (12
@@ -142,11 +143,14 @@ sample wherever nothing wrapped before:
 
 - **The mix.** The modes add into the mix with wrapping sums, which are exact as long as each sample's total is in
   range, whatever the partial sums do on the way. The first pass only notes whether a partial sum wrapped; when one did
-  (rarely: a voice struck again and again), the block's modes run again counting each sample's wraps, and a sample whose
-  count is not zero saturates.
+  (rarely: a voice struck again and again, or a sudden fall in pitch), the block's modes run again counting each
+  sample's wraps, and a sample whose count is not zero saturates. Where no partial sum can wrap (a calm block, [CPU](#cpu)),
+  the first pass does not note them.
 - **The modes.** A mode at 0.8 of full scale or more (from its state, once a block and after a strike joins) runs the
   block with each output saturated where it would wrap. A mode grows by under 3% of full scale a step and one note
-  alone stays below 0.75, so a mode below 0.8 cannot reach full scale before the next look.
+  alone stays below about 0.78, so a mode below 0.8 cannot reach full scale before the next look. Below that, its sum
+  is worked out in unsigned arithmetic: past half scale, `2 y1` leaves the 32-bit range on the way back into it, which
+  signed arithmetic leaves undefined in C++.
 - **The band** after the modes saturates where its output would leave the 32-bit range (full scale): it is worked
   out as a quarter of itself and the rest, and the quarter cannot wrap until four times the range.
 - **The FIR** finds its second difference by parts where it would wrap (a full-scale mix at the top of the band), and
@@ -159,7 +163,10 @@ sample wherever nothing wrapped before:
 Checked over 36,585 settings (the knobs at three to five positions each, notes from C1 to G9, struck every 4 ms to 260 ms or once, with
 bends and knob sweeps) and the 1,875 of the CPU check's grid: the output is bit for bit the old one in every setting
 where nothing in the old engine left the 32-bit range (it did in 8,966), and nothing in the new one ever does. The
-Blackfin build renders the grid bit for bit as the host does.
+Blackfin build renders the grid bit for bit as the host does. One place found since is not guarded: the drive's
+high-pass, when the pitch falls about three octaves within one block. Its state, kept under the new note's
+coefficients, overshoots: 1.5 times full scale after a 36-semitone fall, 0.76 after 24, 0.37 after 12. The modes'
+guards and the limiter still keep the output under its ceiling. Bends and glides are far from it.
 
 ## How it was checked
 
@@ -178,6 +185,10 @@ python tools/gen_tables.py             # after changing a constant
 - It renders all 27 reference settings through the port and through the double-precision model, and compares the
   FM core, the resonator's drive, the mix after the modes and the output: every stage of every setting at 62 to 79 dB
   SNR (limit 55).
+- `tools/check_renders.py` compares with the float reference's own eight modes at the same knob value. Metal runs six
+  over the knob, so at `modes_050`, `modes_100` and `extreme_b` the reference has a mode Metal does not (at C3 about
+  794 Hz and 2 kHz), and its spectrum column reads about 97 dB there: Metal's band is empty. That is the mode count,
+  not an error; before the Fidelity changes the port's own floor filled that band and it read about 40 dB.
 - Against the engine before it ran at half rate: every spectral peak within 50 dB of the loudest matches to 0.3 dB up
   to C6 at the default settings, and to 1 to 3 dB at the extremes (C7, RATIO 1, the top modes near 10 kHz). What
   went is content above 11 kHz, 70 dB down at every setting, and some of the old engine's own images near 11 kHz.
@@ -248,7 +259,7 @@ The two cost about 320 instructions a mode per voice block: the mode loop runs a
 against about 13 a sample before (counted from the compiled code; unrolled by two, or a function of its own, it was no
 better), and the drive's high-pass, with no pair sums to form, about 110 fewer. In all about 8,900 a voice block at
 the defaults and 12,200 at MODES 6, against 8,400 and 10,400 with the shortcuts (the table below is from before the
-three). The voice is 28 bytes smaller (`voiceBytes` 908).
+three). The voice was 28 bytes smaller (`voiceBytes` 908; 932 since calm blocks, [CPU](#cpu)).
 
 **The half rate is not the cause** of any of it: the reference has almost nothing above 5 kHz at most settings
 (120 dB down above 11 kHz at the defaults, 100 dB at C6 with RATIO 1). A full-rate voice would need the same two fixes
@@ -259,7 +270,8 @@ settings measured.
 ## CPU
 
 Blackfin instructions per voice block, counted on the GNU Blackfin simulator running the SDK's own compiler output
-(the pinned GCC 8 fork, `-mcpu=bf707 -O2`; the simulator given the Blackfin+ 32-bit multiply it lacked), at 440 Hz:
+(the pinned GCC 8 fork, `-mcpu=bf707 -O2`; the simulator given the Blackfin+ 32-bit multiply it lacked), at 440 Hz,
+before the limiter and the [Fidelity](#fidelity) changes (now about 8,800 at the defaults and 11,500 at MODES 6; below):
 
 | Setting | Metal | without the overflow guards | before the final pass | 2op FM |
 | --- | --- | --- | --- | --- |
@@ -269,9 +281,10 @@ Blackfin instructions per voice block, counted on the GNU Blackfin simulator run
 | A note-on block, a fresh voice (defaults) | 16,460 | 15,190 | 18,390 | |
 | A note-on block, a fresh voice (MODES 6) | 20,530 | 18,590 | 22,690 | |
 
-A block is 1.45 ms, about 580,000 cycles at 400 MHz: eight held voices take about 13% of it at MODES 6, and eight
-voices starting in the same block about 28%. A block where a partial sum of the mix wraps (a voice built up by
-repeated strikes) runs its modes twice. The Blackfin+ predicts branches, so a count of instructions is the fair
+A block is 1.45 ms, about 580,000 cycles at 400 MHz: eight held voices take about 12% of it at the defaults and 16%
+at MODES 6. Eight voices starting in the same block took about 28% at the table's figures; note-on blocks have not been
+counted again since, and the Fidelity changes add to them. A block where a partial sum of the mix wraps (a sudden
+fall in pitch) runs its modes twice. The Blackfin+ predicts branches, so a count of instructions is the fair
 measure; data stalls and cache misses come on top (the voice's per-block code is about 9 KB, the instruction cache
 16 KB; the set-up and the mix's second pass add 12 KB that run only on a change or a wrap).
 
@@ -305,6 +318,27 @@ Most of that saving is register allocation in one large function, so later chang
 way. Tried and not kept (each more instructions): per-function optimisation attributes (and clang rejects them), the
 half-band's paths in separate loops, the numerator or the carrier unrolled, the high-pass, the core or the modes in
 functions of their own.
+
+**Calm blocks.** The first pass's notes on the mix (whether a partial sum wrapped) cost 4 to 5 instructions a sample
+for each mode. They are only needed where a sum could wrap:
+
+- **The test.** Take the drive's peak D (the accumulator starts at it). For each sounding mode, take its amplitude A
+  from its state (as `hot()` reads it) and the most the drive can add to it in a block, G = 32 b (D / 2) / sin th.
+  If D + sqrt(2 n sum(A^2 + G^2)) stays under full scale, with a sixteenth to spare for rounding, no partial sum can
+  wrap. `calm()` checks this once a block.
+- **The saving.** A calm block runs its modes without the notes and without the hot check. A high mode then takes 17
+  instructions a sample and a low one 20, against 22 and 25.
+- **How often.** It holds on 98.5% of a held note's blocks (3,125 knob settings, C0 to C9), and never where a partial
+  sum would leave the range. A strike's block and a loud one take the noted pass as before.
+
+Counted from the compiled code, `calm()` costs about 125 (96 of them for the drive's peak) plus about 43 a sounding mode
+and 15 a silent one. A held block takes about 75 fewer instructions at the defaults and about 680 fewer at MODES 6
+(about 8,800 and 11,500). Note-on blocks don't run it.
+
+The output is the same bit for bit over 162,500 blocks: knob grids, restrikes, bends, falls of up to three octaves
+and knob sweeps. `hot()` now reads the amplitude through 2^-16 / sin^2 th per mode (`isn2`, in place of its limit).
+With each mode's growth term (`gb`), the voice is 24 bytes larger (`voiceBytes` 932). The code is about 1 KB larger:
+`process()` is 10.3 KB and `calm()` 240 bytes.
 
 `sdk.py test` estimates 20,000 to 30,000 Blackfin instructions per voice block at the heaviest setting, varying that
 much between runs. The estimate times the host, where the SDK's portable Q31 multiply takes a dozen instructions and an
